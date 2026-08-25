@@ -20,15 +20,3 @@ Eternity is a dynamic, AI-driven text adventure RPG built with Python and Flask.
 *   **AI & Audio APIs:** Google GenAI (`gemini-3.1-flash-lite`), Google Cloud Text-to-Speech
 
 ---
-
-## 🚀 Local Development Setup
-
-### 1. Prerequisites
-*   Python 3.8+ installed on your machine.
-*   A Google Gemini API Key.
-*   A Google Cloud Service Account JSON file (with Text-to-Speech API enabled).
-
-### 2. Environment Configuration
-Create a `.env` file in the root directory to safely store your Google Cloud credentials path:
-```env
-GOOGLE_APPLICATION_CREDENTIALS="google-credentials.json"
