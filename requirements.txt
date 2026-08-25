@@ -5,3 +5,4 @@ google-genai
 werkzeug
 requests
 google-cloud-texttospeech
+gunicorn
