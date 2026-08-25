@@ -84,6 +84,7 @@ button:hover { opacity: 0.9; }
 }
 
 .modal {
+    background-color: var(--panel-bg);
     display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.95); flex-direction: column;
     justify-content: center; align-items: center; text-align: center;

@@ -400,24 +400,24 @@ function setAtmosphere(mood) {
     }
     
     if (mood === 'mystical') {
-        root.style.setProperty('--bg-color', '#1a0b2e'); // Deep purple
+        root.style.setProperty('--panel-bg', '#2d1b4e'); // Muted deep purple
         root.style.setProperty('--accent-color', '#ffd700'); // Gold
     } else if (mood === 'icy') {
-        root.style.setProperty('--bg-color', '#0f172a'); // Deep blue
+        root.style.setProperty('--panel-bg', '#1e293b'); // Slate blue
         root.style.setProperty('--accent-color', '#00ffff'); // Cyan
     } else if (mood === 'combat') {
-        root.style.setProperty('--bg-color', '#2a0808'); // Dark red
+        root.style.setProperty('--panel-bg', '#3f0f0f'); // Muted dark red
         root.style.setProperty('--accent-color', '#ff4444'); // Bright red
     } else if (mood === 'darkness') {
-        root.style.setProperty('--bg-color', '#000000'); // Pitch black
+        root.style.setProperty('--panel-bg', '#121212'); // Very dark grey
         root.style.setProperty('--accent-color', '#ffffff'); // Pure white
     } else if (mood === 'forest') {
-        root.style.setProperty('--bg-color', '#06402b'); // Deep jungle green
+        root.style.setProperty('--panel-bg', '#0f3322'); // Muted jungle green
         root.style.setProperty('--accent-color', '#4ade80'); // Vibrant toxic green
     } else {
         // Default resets (Neutral)
-        root.style.setProperty('--bg-color', '#111827');
-        root.style.setProperty('--accent-color', '#3b82f6');
+        root.style.setProperty('--panel-bg', '#1f2937'); // Default UI gray
+        root.style.setProperty('--accent-color', '#3b82f6'); // Standard blue
     }
 }
 

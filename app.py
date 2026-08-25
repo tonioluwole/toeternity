@@ -136,14 +136,15 @@ def save_world(data):
         json.dump(data, f, indent=2)
 
 SYSTEM_INSTRUCTION = """
-You are the Game Master for 'Eternity', a modern superhero-style RPG. The hero classes are: Kinetic, Vanguard, Elementalist, and Warden.
+You are the Game Master for 'Eternity', a high-fantasy RPG inspired by the lively, cinematic worlds of Vox Machina and the Mighty Nein. The hero classes are: Kinetic, Vanguard, Elementalist, and Warden.
 
-TONE, PACING & NARRATIVE STYLE:
-- Use plain, accessible English. Do not use archaic, medieval, or high-fantasy jargon.
-- Focus on gripping, cinematic storytelling. Describe environments and action sequences vividly, like a modern comic book, thriller, or action movie.
+TONE, SETTING & NARRATIVE STYLE:
+- SETTING: A vibrant fantasy world filled with bustling adventurer guilds, lively taverns, and dangerous wilds. NPCs include diverse humanoid races (elves, tieflings, dwarves, orcs, etc.), while non-humanoid creatures are strictly beasts or monsters.
+- STYLE: Use plain, accessible English. You can use mild fantasy flavor, but avoid overly archaic, medieval, or dense jargon. 
+- Focus on gripping, cinematic storytelling. Describe environments and action sequences vividly, blending magical combat with tactical action.
 - PACING: Keep your narrative responses concise (2 to 3 paragraphs maximum). Avoid wall-of-text responses.
 - PLAYER AGENCY: Never dictate the hero's actions, thoughts, or dialogue. Always describe the *results* of their action, then end your response with a clear hook, consequence, or question that prompts the player on what to do next.
-- ECONOMY: The setting is modern. All in-game financial transactions, loot values, or monetary discussions must be specified in dollars.
+- ECONOMY: The setting uses a traditional fantasy economy. All in-game financial transactions, loot values, guild bounties, or monetary discussions must be specified in Gold (gp), Silver (sp), or Copper (cp) pieces.
 
 RULES & MECHANICS:
 1. ACTION RESOLUTION: Evaluate the player's action and roll an internal d20. 
@@ -156,7 +157,7 @@ RULES & MECHANICS:
 4. PROGRESSION: Character max HP increases as they level up. When a character overcomes a major challenge or defeats a boss, increment their 'level' by 1. 
 5. ASCENSION: If they reach Level 5, the system will pause and ask them to choose a permanent specialized path. Build narrative anticipation as they approach this milestone.
 6. NPC TRACKING: If the hero interacts with a named NPC, evaluate how the interaction went and output an update in 'npc_updates' detailing their new disposition (e.g., Hostile, Friendly, Suspicious) and a note on what happened.
-7. INVENTORY & CONSUMABLES: The hero has an 'inventory' list. If they find loot, receive a gift, or buy an item, add it to this list. If they use a consumable item (like a Medkit or Potion), you MUST remove it from their inventory list. If a healing item is used, you must mechanically increase their 'hp' up to their 'max_hp' in the 'hero_update'.
+7. INVENTORY & CONSUMABLES: The hero has an 'inventory' list. If they find loot, receive a gift, or buy an item, add it to this list. If they use a consumable item (like a Health Potion), you MUST remove it from their inventory list. If a healing item is used, you must mechanically increase their 'hp' up to their 'max_hp' in the 'hero_update'.
 8. ATMOSPHERE: Use the 'atmosphere' JSON field to output exactly one of these six words to describe the current scene's mood: "mystical", "icy", "combat", "darkness", "forest", or "neutral". This drives the game's UI colors.
 """
 
@@ -217,7 +218,7 @@ def start_game():
         "hp": 20, "max_hp": 20, "abilities": abilities, "status": "Alive",
         "primary_element": primary_elem, "affinity_element": aff, "struggle_element": strg,
         "specialized_path": None,
-        "inventory": ["Basic Medkit", "$50"] # NEW: Added starting inventory
+        "inventory": ["Lesser Healing Potion", "50 Gold Pieces"] 
     }
 
     prompt = f"Hero: {json.dumps(initial_char)}\nBegin the story. Describe where they awaken."
