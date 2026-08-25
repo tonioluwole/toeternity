@@ -1,52 +1,34 @@
-# Eternity - Text-Based RPG (Alpha)
+# Eternity: Superhero Text RPG
 
-**Eternity** is an interactive, modern superhero-style text-based RPG powered by an AI Game Master. Players create unique heroes with distinct classes, elements, and power sets, navigating a dynamically generated story where decisions and dice rolls directly shape the world, inventory, and NPC relationships.
+Eternity is a dynamic, AI-driven text adventure RPG built with Python and Flask. You play as a burgeoning superhuman in a modern world, guided by an AI Game Master that dynamically resolves combat, tracks inventory, manages NPC relationships, and even shifts the game's visual atmosphere based on the narrative mood.
 
----
+## 🌟 Core Features
 
-## 🌟 Features & Systems
+*   **AI Game Master:** Powered by Google's Gemini API, the DM evaluates creative power use, rolls internal d20s for action resolution, and drives a cinematic narrative.
+*   **Immersive Voice Narration:** Fully integrated with Google Cloud Text-to-Speech (Chirp3-HD) to voice the Game Master's narration.
+*   **Dynamic UI Atmosphere:** The frontend actively listens to the AI's "mood" output and dynamically shifts the CSS theme (e.g., Pitch Black for darkness, Deep Purple for mystical, Blood Red for combat).
+*   **Deep RPG Mechanics:** 
+    *   **Four Base Classes:** Kinetic, Vanguard, Elementalist, and Warden.
+    *   **Elemental Matrix:** Elementalists must balance their primary element, affinities, and struggles in combat.
+    *   **Level 5 Ascension:** A branching progression system where heroes permanently unlock specialized, god-tier ability paths.
+*   **State Tracking:** A built-in short-term memory buffer keeps the AI contextually aware, while local JSON saves track HP, inventory, and NPC dispositions.
 
-### 🦸 Hero Profile & Mechanics
-* **Dynamic Stats:** Real-time tracking of Hero Name, Level, Health Points (HP), Abilities, and Specializations.
-* **Elemental Matrix:** Exclusive system for Elementalists tracking **Primary**, **Affinity**, and **Struggle** elements to influence combat and narrative outcomes.
-* **Level Progression:** Dynamic leveling system managed by the Game Master; reaching Level 5 unlocks specialized power paths.
+## 🛠️ Tech Stack
 
-### 🎒 Inventory & Items
-* Interactive inventory panel updating on the fly when items are found, looted, or used in narrative turns.
-
-### 👥 NPC Memory System
-* Persistent NPC tracking ledger that logs character interactions, relationships, dispositions, and key story events across gameplay sessions.
-
-### 💾 Session & World Management
-* **Save / Load Game:** Save full character progress and story history to return later.
-* **New Game Reset:** Complete world reset option that clears previous NPC memory ledgers and builds a fresh universe.
-* **Main Menu Toggle:** Seamlessly return to the main splash screen at any point.
-* **Class Guide:** Built-in sidebar reference manual describing all playstyles.
+*   **Backend:** Python, Flask, Pydantic
+*   **Frontend:** Vanilla JavaScript, HTML5, CSS3
+*   **AI & Audio APIs:** Google GenAI (`gemini-3.1-flash-lite`), Google Cloud Text-to-Speech
 
 ---
 
-## ⚡ Hero Classes
+## 🚀 Local Development Setup
 
-* **Kinetic:** A psychic hero who uses the power of their mind to throw objects, build forcefields, and control enemies.
-* **Vanguard:** A superhuman brawler who relies on extreme physical speed, giant size, and unbreakable toughness.
-* **Elementalist:** A master of natural forces who attacks and defends using blasts of fire, water, earth, and lightning.
-* **Warden:** A fierce shape-shifter who can command explosive plant growth and transform into deadly wild animals.
+### 1. Prerequisites
+*   Python 3.8+ installed on your machine.
+*   A Google Gemini API Key.
+*   A Google Cloud Service Account JSON file (with Text-to-Speech API enabled).
 
----
-
-## 🛠️ Tech Stack & Architecture
-
-* **Backend:** Python 3.14, Flask, Pydantic, Gemini API (AI Game Master Engine)
-* **Frontend:** HTML5, CSS3, JavaScript (Async Fetch API)
-* **Data Storage:** Local JSON persistence for character state and world/NPC logs
-
----
-
-## 🚀 Getting Started
-
-1. **Clone or Extract the Project:**
-   Ensure `app.py`, `models.py`, `templates/`, and `static/` are in the main project folder.
-
-2. **Install Dependencies:**
-   ```bash
-   pip install flask pydantic werkzeug
+### 2. Environment Configuration
+Create a `.env` file in the root directory to safely store your Google Cloud credentials path:
+```env
+GOOGLE_APPLICATION_CREDENTIALS="google-credentials.json"
