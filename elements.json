@@ -1,0 +1,22 @@
+{
+  "elemental_wheel": [
+    "fire",
+    "air",
+    "electricity",
+    "light",
+    "water",
+    "plant",
+    "earth",
+    "dark"
+  ],
+  "elemental_matrix": {
+    "fire": { "affinity": "air", "struggle": "water" },
+    "air": { "affinity": "electricity", "struggle": "plant" },
+    "electricity": { "affinity": "light", "struggle": "earth" },
+    "light": { "affinity": "water", "struggle": "dark" },
+    "water": { "affinity": "plant", "struggle": "fire" },
+    "plant": { "affinity": "earth", "struggle": "air" },
+    "earth": { "affinity": "dark", "struggle": "electricity" },
+    "dark": { "affinity": "fire", "struggle": "light" }
+  }
+}

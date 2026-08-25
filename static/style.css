@@ -1,0 +1,282 @@
+:root {
+    --bg-color: #02000a;
+    --panel-bg: #001c53;
+    --text-color: #ffffff;
+    --accent-color: #08e7f7;
+    --accent-color2: white;
+    --danger-color: #ef4444;
+    --border-color: #2d3748;
+}
+
+
+.google-sans-MainFont {
+  font-family: "Google Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-variation-settings:
+    "GRAD" 0;
+}
+
+
+body {
+    background-color: var(--bg-color); color: var(--text-color);
+    font-family: 'Google Sans';
+    margin: 0; display: flex; height: 100vh;
+}
+
+h2, h3 { color: var(--accent-color); margin-top: 0; margin-bottom: 10px; }
+.divider { border-bottom: 1px solid var(--border-color); margin: 15px 0; }
+.accent { color: var(--accent-color); }
+.danger { color: var(--danger-color); }
+
+#sidebar {
+    width: 15vw; /* Sets width to exactly 15% of the browser window */
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border-color);
+    padding: 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-width: 400px; /* Ensures the sidebar doesn't shrink too much on smaller screens */
+    flex-shrink: 0; /* Prevents the sidebar from shrinking */
+    scrollbar-width: none; 
+}
+
+/* Hides the vertical scrollbar in Chrome, Edge, and Safari */
+#sidebar::-webkit-scrollbar {
+    display: none;
+}
+
+#main-game { flex-grow: 1; display: flex; flex-direction: column; padding: 20px; }
+
+#main-game::-webkit-scrollbar {
+    display: none;
+}
+
+#story-log {
+    flex-grow: 1; background: var(--panel-bg);
+    border: 1px solid var(--border-color); border-radius: 4px;
+    padding: 20px; overflow-y: auto; margin-bottom: 15px; white-space: pre-line;
+    line-height: 1.5; font-size: 16px;
+}
+
+#story-log::-webkit-scrollbar {
+    display: none;
+}
+
+#input-panel { display: flex; gap: 10px; }
+input[type="text"] {
+    flex-grow: 1; background: #000; border: 1px solid var(--border-color);
+    color: #fff; padding: 15px; font-family: inherit; font-size: 16px; outline: none;
+}
+input[type="text"]:focus { border-color: var(--accent-color); }
+
+button {
+    background: var(--accent-color); border: none; color: #fff;
+    padding: 15px 25px; cursor: pointer; font-weight: bold; font-family: inherit;
+}
+button:hover { opacity: 0.9; }
+
+#save-button,#action-button{
+    background-color: var(--accent-color2); border: none; color: #000;
+    padding: 15px 25px; cursor: pointer; font-weight: bold; font-family: inherit;
+}
+
+.modal {
+    display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.95); flex-direction: column;
+    justify-content: center; align-items: center; text-align: center;
+}
+.modal h1 { color: var(--danger-color); font-size: 3rem; }
+
+/* Add to bottom of style.css */
+
+.path-container {
+    display: flex;
+    gap: 20px;
+    width: 80%;
+    max-width: 900px;
+}
+
+.path-card {
+    background: #111827;
+    border: 1px solid var(--accent-color);
+    padding: 25px;
+    flex: 1;
+    border-radius: 8px;
+    text-align: left;
+}
+
+.path-card h3 {
+    color: #fff;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    font-size: 1.5rem;
+}
+
+.path-card ul {
+    list-style-type: none;
+    padding: 0;
+    color: #a0aec0;
+    min-height: 120px;
+}
+
+.path-card ul li {
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.path-card button {
+    width: 100%;
+    margin-top: 15px;
+    background: transparent;
+    border: 2px solid var(--accent-color);
+    color: var(--accent-color);
+}
+
+.path-card button:hover {
+    background: var(--accent-color);
+    color: #fff;
+}
+
+/* Health Bar Styles */
+.health-bar-container {
+    width: 100%;
+    height: 18px;
+    background-color: #2d3748; /* Dark gray background */
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 5px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+}
+
+.health-bar-fill {
+    height: 100%;
+    width: 100%; /* Starts full */
+    background-color: #10b981; /* Green default */
+    transition: width 0.4s ease-out, background-color 0.4s ease-out;
+}
+/* Ability Dropdown Styles */
+details.ability-dropdown {
+    background: #1f2937;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    padding: 10px;
+}
+
+details.ability-dropdown summary {
+    cursor: pointer;
+    font-weight: bold;
+    color: var(--text-color);
+    outline: none;
+    list-style: none; /* Hides default arrow in some browsers */
+    user-select: none;
+}
+
+/* Custom arrow */
+details.ability-dropdown summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 0.8em;
+    color: var(--accent-color);
+    transition: transform 0.2s;
+}
+
+details.ability-dropdown[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.ability-desc {
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #9ca3af;
+    padding-left: 20px;
+    border-left: 2px solid var(--accent-color);
+    line-height: 1.4;
+}
+
+#abilities-list {
+    padding-left: 0;
+    margin-left: 0;
+    list-style-type: none;
+}
+
+/* NPC Card Styles */
+.npc-card {
+    background: #1f2937;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+}
+
+.npc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.npc-name {
+    font-weight: bold;
+    color: #fff;
+    font-size: 0.95em;
+}
+
+.npc-badge {
+    font-size: 0.75em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+/* Dynamic Disposition Colors */
+.badge-friendly { background: #065f46; color: #34d399; }
+.badge-hostile  { background: #991b1b; color: #fca5a5; }
+.badge-indebted { background: #1e40af; color: #93c5fd; }
+.badge-neutral  { background: #374151; color: #d1d5db; }
+
+.npc-notes {
+    font-size: 0.85em;
+    color: #9ca3af;
+    line-height: 1.3;
+}
+
+/* Inventory Styles */
+#inventory-list {
+    padding-left: 0;
+    margin-left: 0;
+    list-style-type: none;
+    margin-bottom: 20px;
+}
+
+.inventory-item {
+    background: #374151;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    font-size: 0.9em;
+    color: #d1d5db;
+    border-left: 3px solid #10b981; /* Green accent */
+}
+
+.inventory-item.empty {
+    border-left-color: #4b5563; /* Gray accent for empty */
+    font-style: italic;
+    color: #9ca3af;
+}
+
+@keyframes lowHealthPulse {
+    0% { box-shadow: inset 0 0 0px rgba(220, 38, 38, 0); }
+    50% { box-shadow: inset 0 0 40px rgba(220, 38, 38, 0.4); }
+    100% { box-shadow: inset 0 0 0px rgba(220, 38, 38, 0); }
+}
+
+body.low-hp {
+    animation: lowHealthPulse 2s infinite;
+}

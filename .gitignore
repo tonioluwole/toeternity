@@ -1,0 +1,9 @@
+# Local Environment & Secrets
+.env
+*-credentials.json
+google-credentials.json
+Eternity Alpha.zip
+
+# Local Save Data
+eternity_save.json
+eternity_world.json

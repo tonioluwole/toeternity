@@ -1,0 +1,7 @@
+flask
+pydantic
+python-dotenv
+google-genai
+werkzeug
+requests
+google-cloud-texttospeech
