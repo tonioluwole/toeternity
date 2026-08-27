@@ -10,3 +10,5 @@ eternity_world.json
 
 __pycache__/
 *.pyc
+
+flask_session/

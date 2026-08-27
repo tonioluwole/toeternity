@@ -458,7 +458,7 @@ def consume_item():
     
     if item in char.get("inventory", []):
         char["inventory"].remove(item)
-        heal_amount = 15
+        heal_amount = 5
         char["hp"] = min(char["max_hp"], char["hp"] + heal_amount)
         
         # Save back to session
