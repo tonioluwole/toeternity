@@ -106,7 +106,7 @@
     </div>
 
     <div id="main-game">
-        <div id="story-log">Connecting to Eternity DM...</div>
+        <div id="story-log" aria-hidden="true">Connecting to Eternity DM...</div>
         <div id="input-panel">
             <input type="text" id="action-input" placeholder="Type your action..." onkeydown="if(event.key === 'Enter') sendAction()">
             <button id="action-button" onclick="sendAction()">Act</button>

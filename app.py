@@ -134,7 +134,7 @@ RULES & MECHANICS:
 2. COMBAT: Adjust difficulty based on clever power use. Track HP logically. If a player is hit, reduce their HP in the 'hero_update'. If HP <= 0, status is 'Dead'. Record their death in 'major_event_summary'.
 3. ELEMENTAL COMBAT: If the hero is an Elementalist, actively factor in their 'primary_element', 'affinity_element', and 'struggle_element'. Give them narrative and mechanical advantages when using affinities, and severe disadvantages/damage penalties when facing their struggle element.
 4. PROGRESSION: Character max HP increases as they level up. When a character overcomes a major challenge or defeats a boss, increment their 'level' by 1. 
-5. COMPANION: If the hero has rescued the fairy companion, she travels with them permanently. She should periodically interject with witty commentary, mildly unhelpful advice, or minor magical distractions during the hero's actions to provide comedic relief.
+5. COMPANION: DO NOT introduce or mention the fairy companion in Chapters 1 or 2. She can ONLY appear when Chapter 3 begins. Once rescued in Chapter 3, she travels with the hero permanently, offering witty commentary, mildly unhelpful advice, and comedic relief.
 6. ASCENSION: If they reach Level 5, the system will pause and ask them to choose a permanent specialized path. Build narrative anticipation as they approach this milestone.
 7. NPC TRACKING: If the hero interacts with a named NPC, evaluate how the interaction went and output an update in 'npc_updates' detailing their new disposition (e.g., Hostile, Friendly, Suspicious) and a note on what happened.
 8. INVENTORY & CONSUMABLES: The hero has an 'inventory' list. If they find loot, receive a gift, or buy an item, add it to this list. If they use a consumable item (like a Health Potion), you MUST remove it from their inventory list. If a healing item is used, you must mechanically increase their 'hp' up to their 'max_hp' in the 'hero_update'.
@@ -192,13 +192,18 @@ def start_game():
     initial_char = {
         "name": char_name, "class": char_class, "level": 1,
         "hp": 20, "max_hp": 20, "abilities": abilities, "status": "Alive",
-        "current_chapter": 1, # Track the plot
+        "current_chapter": 1,
         "primary_element": primary_elem, "affinity_element": aff, "struggle_element": strg,
         "specialized_path": None,
         "inventory": ["Lesser Healing Potion", "50 Gold Pieces"] 
     }
 
-    prompt = f"Hero: {json.dumps(initial_char)}\nBegin the story. Describe where they awaken."
+    chapter_1_goal = PLOT_POINTS[1]
+    prompt = (
+        f"Hero State: {json.dumps(initial_char)}\n"
+        f"CURRENT PLOT OBJECTIVE: {chapter_1_goal}\n\n"
+        "Begin the story. Describe where the hero awakens alone in the crumbling ruin."
+    )
 
     client = get_gemini_client()
     if client is None:
@@ -353,6 +358,7 @@ def process_action():
     return jsonify({
         "character": char_dict, 
         "narrative": dm_data.narrative, 
+        "d20_roll": dm_data.d20_roll, 
         "is_dead": is_dead, 
         "path_choices": path_choices,
         "npc_ledger": npc_ledger,

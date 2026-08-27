@@ -281,3 +281,67 @@ details.ability-dropdown[open] summary::before {
 body.low-hp {
     animation: lowHealthPulse 2s infinite;
 }
+
+/* Dice Roll Badges */
+.roll-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 0.9em;
+    margin-bottom: 8px;
+    background: #374151;
+    color: #fff;
+    border: 1px solid #4b5563;
+}
+.roll-fail { border-color: #ef4444; color: #fca5a5; }
+.roll-success { border-color: #4ade80; color: #bbf7d0; }
+.roll-crit-fail { background: #7f1d1d; border-color: #ef4444; color: #fff; }
+.roll-crit-success { background: #854d0e; border-color: #ffd700; color: #fff; }
+
+/* Reactive Screen Effects */
+@keyframes shake {
+    0%, 100% { transform: translate(0, 0); }
+    10%, 30%, 50%, 70%, 90% { transform: translate(-4px, 2px); }
+    20%, 40%, 60%, 80% { transform: translate(4px, -2px); }
+}
+
+.crit-fail-anim {
+    animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+    box-shadow: inset 0 0 40px rgba(239, 68, 68, 0.4) !important;
+}
+
+.crit-success-anim {
+    box-shadow: inset 0 0 50px rgba(255, 215, 0, 0.3) !important;
+    transition: box-shadow 0.3s ease-out;
+}
+
+/* Chapter Title Banner */
+.chapter-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 24px 0 16px 0;
+    padding: 12px 20px;
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.2) 50%, rgba(59, 130, 246, 0.05) 100%);
+    border-top: 1px solid var(--accent-color);
+    border-bottom: 1px solid var(--accent-color);
+    text-align: center;
+}
+
+.chapter-number {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent-color);
+    margin-bottom: 4px;
+}
+
+.chapter-title {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #ffffff;
+    letter-spacing: 0.05em;
+}

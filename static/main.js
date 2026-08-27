@@ -2,33 +2,46 @@
 let voiceEnabled = true;
 let currentDMAudio = null
 
+const CHAPTER_TITLES = {
+    1: "The Awakening",
+    2: "The Shadow Ambush",
+    3: "The Glimmering Nuisance",
+    4: "The Prism Mechanism",
+    5: "The Betrayal",
+    6: "The World-Forge Climax",
+    7: "The Legacy"
+};
+
+function renderChapterBanner(chapterNum) {
+    const title = CHAPTER_TITLES[chapterNum] || "A New Journey";
+    return `
+        <div class="chapter-banner">
+            <div class="chapter-number">Chapter ${chapterNum}</div>
+            <div class="chapter-title">${title}</div>
+        </div>
+    `;
+}
+
 async function speakDM(text) {
     if (!voiceEnabled || !text) return;
     
-    // Stop browser TTS
+    // Stop browser TTS and active audio immediately
     window.speechSynthesis.cancel();
-    
-    // Stop any playing audio
     if (currentDMAudio) {
         currentDMAudio.pause();
         currentDMAudio.currentTime = 0;
     }
 
     try {
-        // Ask your secure Python backend for the audio file
         const response = await fetch('/api/voice', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text })
         });
 
-        if (response.ok) {
-            // Convert the server's response into a playable URL
+        if (response.ok && voiceEnabled) { // Double check mute state after fetch
             const blob = await response.blob();
             const audioUrl = URL.createObjectURL(blob);
-            
             currentDMAudio = new Audio(audioUrl);
             currentDMAudio.play();
         } else {
@@ -36,24 +49,28 @@ async function speakDM(text) {
         }
     } catch (error) {
         console.error("Voice Error, falling back to browser TTS:", error);
-        // Fallback to browser voice if your quota runs out or the server fails
-        const utterance = new SpeechSynthesisUtterance(text);
-        window.speechSynthesis.speak(utterance);
+        // Only use fallback if voice is still enabled
+        if (voiceEnabled) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(utterance);
+        }
     }
 }
 
 function toggleMute() {
-    // Flip the boolean value
     voiceEnabled = !voiceEnabled;
-    
     const muteBtn = document.getElementById('mute-btn');
     
     if (voiceEnabled) {
         muteBtn.innerText = '🔊 Mute';
     } else {
         muteBtn.innerText = '🔇 Unmute';
-        // Instantly cut off any currently playing voice
+        // Instantly cut off both browser TTS and server audio streams
         window.speechSynthesis.cancel();
+        if (currentDMAudio) {
+            currentDMAudio.pause();
+            currentDMAudio.currentTime = 0;
+        }
     }
 }
 
@@ -169,12 +186,14 @@ async function startNewGame() {
         }
         console.log("[Step 8] UI updated on screen");
         
-        log.innerText = data.story;
+        // Render banner and story once
+        log.innerHTML = renderChapterBanner(1) + `<div>${data.story}</div>`;
+        
         if (typeof speakDM === 'function') {
             speakDM(data.story);
         }
+
         console.log("[Step 9] Game successfully started!");
-        //Store the ledger in memory so the autosave can see it
         window.currentNpcLedger = data.npc_ledger; 
         
         autoSaveGame();
@@ -280,12 +299,21 @@ async function sendAction() {
         body: JSON.stringify({ action: action, character: characterState, history: chatHistory })
     });
 
+    // Capture existing chapter before updating characterState
+    const previousChapter = characterState ? characterState.current_chapter : 1;
+
     const data = await res.json();
     
     // 1. Update core states
     characterState = data.character;
     window.currentNpcLedger = data.npc_ledger;
-    
+    const currentChapter = characterState.current_chapter || 1;
+
+    // Check if the chapter advanced
+    if (currentChapter > previousChapter) {
+        log.innerHTML += `\n${renderChapterBanner(currentChapter)}\n`;
+    }
+
     // 2. Update the UI
     updateUI();
     updateNPCs(data.npc_ledger);
@@ -294,29 +322,74 @@ async function sendAction() {
         setAtmosphere(data.atmosphere);
     }
 
-    // 3. Append the DM's text to the screen
-    log.innerText += data.narrative;
-    log.scrollTop = log.scrollHeight;
-    
-    speakDM(data.narrative.replace(/\*/g, ''));
+    // 3. Append the instant Roll Badge
+    if (data.d20_roll) {
+        let rollClass = "roll-success";
+        let rollText = "Success";
+        
+        if (data.d20_roll === 1) {
+            rollClass = "roll-crit-fail";
+            rollText = "Critical Failure!";
+            triggerScreenEffect('crit-fail-anim');
+        } else if (data.d20_roll === 20) {
+            rollClass = "roll-crit-success";
+            rollText = "Critical Success!";
+            triggerScreenEffect('crit-success-anim');
+        } else if (data.d20_roll <= 10) {
+            rollClass = "roll-fail";
+            rollText = "Failure";
+        }
+        log.innerHTML += `\n<div class="roll-badge ${rollClass}">🎲 Roll: ${data.d20_roll} (${rollText})</div>\n\n`;
+    }
 
-    // 4. Update the short-term memory buffer
+    // 4. Update the short-term memory buffer immediately
     chatHistory.push({ role: "Hero", content: action });
     chatHistory.push({ role: "Game Master", content: data.narrative.replace(/\*/g, '') });
-    
     if (chatHistory.length > 10) {
         chatHistory = chatHistory.slice(chatHistory.length - 10);
     }
 
-    // 5. Check for game-altering events
-    if (data.is_dead) {
-        document.getElementById('death-modal').style.display = 'flex';
-    } else if (data.path_choices) {
-        showPathModal(data.path_choices);
+    // 5. Trigger audio before typing starts
+    speakDM(data.narrative.replace(/\*/g, ''));
+
+    // 6. Fast Typewriter Effect & End-of-Turn Checks
+    const textContainer = document.createElement('span');
+    log.appendChild(textContainer);
+    
+    let i = 0;
+    const textToType = data.narrative;
+    const actionInput = document.getElementById('action-input');
+    const actionButton = document.getElementById('action-button');
+    
+    // Disable input while typing to prevent overlap
+    actionInput.disabled = true;
+    actionButton.disabled = true;
+
+    function typeWriter() {
+        if (i < textToType.length) {
+            textContainer.innerHTML += textToType.charAt(i);
+            i++;
+            log.scrollTop = log.scrollHeight; // Auto-scroll with text
+            setTimeout(typeWriter, 5); // 5ms delay = incredibly fast typing
+        } else {
+            // Re-enable inputs once finished
+            actionInput.disabled = false;
+            actionButton.disabled = false;
+            actionInput.focus();
+
+            // Check for game-altering events
+            if (data.is_dead) {
+                document.getElementById('death-modal').style.display = 'flex';
+            } else if (data.path_choices) {
+                showPathModal(data.path_choices);
+            }
+            
+            // SAVE EVERYTHING AFTER TYPING COMPLETES
+            autoSaveGame();
+        }
     }
     
-    // 6. SAVE EVERYTHING AT THE VERY END
-    autoSaveGame();
+    typeWriter();
 }
 
 function showPathModal(choices) {
@@ -534,4 +607,12 @@ function loadAutosave() {
     } catch (err) {
         console.error("Autosave load error:", err);
     }
+}
+
+function triggerScreenEffect(className) {
+    const gameScreen = document.getElementById('main-game');
+    gameScreen.classList.add(className);
+    setTimeout(() => {
+        gameScreen.classList.remove(className);
+    }, 800); // Remove effect after animation finishes
 }
