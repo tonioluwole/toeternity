@@ -174,6 +174,10 @@ async function startNewGame() {
             speakDM(data.story);
         }
         console.log("[Step 9] Game successfully started!");
+        //Store the ledger in memory so the autosave can see it
+        window.currentNpcLedger = data.npc_ledger; 
+        
+        autoSaveGame();
 
     } catch (error) {
         console.error("[CRASH DETECTED]:", error);
@@ -273,39 +277,46 @@ async function sendAction() {
     const res = await fetch('/api/action', {
         method: 'POST',
         headers: apiHeaders(),
-        // We now include the history array in the request payload
         body: JSON.stringify({ action: action, character: characterState, history: chatHistory })
     });
 
     const data = await res.json();
+    
+    // 1. Update core states
     characterState = data.character;
+    window.currentNpcLedger = data.npc_ledger;
+    
+    // 2. Update the UI
     updateUI();
     updateNPCs(data.npc_ledger);
 
-    // Update atmosphere on every turn ---
     if (data.atmosphere) {
         setAtmosphere(data.atmosphere);
     }
 
+    // 3. Append the DM's text to the screen
     log.innerText += data.narrative;
     log.scrollTop = log.scrollHeight;
     
     speakDM(data.narrative.replace(/\*/g, ''));
 
-    // Push the interaction into our short-term memory buffer
+    // 4. Update the short-term memory buffer
     chatHistory.push({ role: "Hero", content: action });
     chatHistory.push({ role: "Game Master", content: data.narrative.replace(/\*/g, '') });
     
-    // Keep only the last 10 interactions (5 full turns) to prevent API token limits
     if (chatHistory.length > 10) {
         chatHistory = chatHistory.slice(chatHistory.length - 10);
     }
 
+    // 5. Check for game-altering events
     if (data.is_dead) {
         document.getElementById('death-modal').style.display = 'flex';
     } else if (data.path_choices) {
         showPathModal(data.path_choices);
     }
+    
+    // 6. SAVE EVERYTHING AT THE VERY END
+    autoSaveGame();
 }
 
 function showPathModal(choices) {
@@ -347,47 +358,7 @@ async function selectPath(pathName) {
     log.scrollTop = log.scrollHeight;
 
     speakDM(data.narrative.replace(/\*/g, ''));
-}
-
-async function saveSession() {
-    if (!characterState) return;
-    const storyText = document.getElementById('story-log').innerText;
-    
-    await fetch('/api/save_game', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        // Add chatHistory to the save payload
-        body: JSON.stringify({ character: characterState, story: storyText, history: chatHistory })
-    });
-    
-    const log = document.getElementById('story-log');
-    log.innerText += `\n\n*** YOUR GAME IS SAVED ***\n\n`;
-    log.scrollTop = log.scrollHeight;
-}
-
-async function loadSession() {
-    const res = await fetch('/api/load_game');
-    const json = await res.json();
-    
-    if (json.status === "success") {
-        const startModal = document.getElementById('start-modal');
-        if (startModal) startModal.style.display = 'none';
-        
-        characterState = json.data.character;
-        // Restore the history from the save file (or default to empty if it's an old save)
-        chatHistory = json.data.history || [];
-        
-        updateUI();
-        updateNPCs(json.data.npc_ledger);
-        
-        const log = document.getElementById('story-log');
-        log.innerText = json.data.story + `\n\n*** GAME LOADED ***\n\n`;
-        log.scrollTop = log.scrollHeight;
-        
-        speakDM("Game loaded. Welcome back, let's begin.");
-    } else {
-        alert("No save file found!");
-    }
+    autoSaveGame();
 }
 
 function setAtmosphere(mood) {
@@ -461,17 +432,106 @@ function updateNPCs(ledger) {
 }
 
 function confirmNewGame() {
-    if (confirm("Are you sure you want to start a new game? Any unsaved progress will be lost.")) {
+    if (confirm("Start a new game? Any unsaved progress in this session will be lost.")) {
         startNewGame();
     }
 }
-
+// 3. Return to Main Menu (Safe Local Exit)
 function goToMainMenu() {
-    if (confirm("Return to the Main Menu? Make sure you have saved your game first!")) {
-        // Stop the DM voiceover immediately
+    if (confirm("Return to main menu? Make sure to save your game first.")) {
         window.speechSynthesis.cancel();
-        
-        // This un-hides the big Start Menu modal to cover the screen again
-        document.getElementById('start-modal').style.display = 'flex';
+        window.location.reload();
+    }
+}
+
+function exitGame() {
+    if (confirm("Are you sure you want to exit? Your progress has been saved locally.")) {
+        // Redirect to a landing screen or reset view
+        window.location.reload(); 
+    }
+}
+
+// --- Silent Background Autosave ---
+function autoSaveGame() {
+    if (!characterState) return;
+    const autoSaveData = {
+        character: characterState,
+        history: chatHistory,
+        npc_ledger: window.currentNpcLedger || {},
+        story_log_html: document.getElementById("story-log").innerHTML,
+        saved_at: new Date().toISOString()
+    };
+    localStorage.setItem("eternity_autosave", JSON.stringify(autoSaveData));
+}
+
+// --- Manual Save to PC (File Download) ---
+function exportSaveFile() {
+    if (!characterState) {
+        alert("No active game to export!");
+        return;
+    }
+    const saveData = {
+        character: characterState,
+        history: chatHistory,
+        npc_ledger: window.currentNpcLedger || {},
+        story_log_html: document.getElementById("story-log").innerHTML,
+        saved_at: new Date().toLocaleString()
+    };
+
+    const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${characterState.name}_eternity_save.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// --- Import Save from PC ---
+function importSaveFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            loadStateIntoGame(data);
+            alert("Save file loaded successfully!");
+        } catch (err) {
+            alert("Invalid save file format.");
+        }
+    };
+    reader.readAsText(file);
+    // Reset the input so the same file can be uploaded again if needed
+    event.target.value = ""; 
+}
+
+// --- Shared State Loader ---
+function loadStateIntoGame(data) {
+    characterState = data.character;
+    chatHistory = data.history || [];
+    window.currentNpcLedger = data.npc_ledger || {};
+
+    document.getElementById("story-log").innerHTML = data.story_log_html || "";
+    updateUI();
+    updateNPCs(window.currentNpcLedger);
+    document.getElementById("start-modal").style.display = "none";
+
+    autoSaveGame();
+}
+
+// --- Check for Autosave on Start / Resume ---
+function loadAutosave() {
+    const raw = localStorage.getItem("eternity_autosave");
+    if (!raw) {
+        alert("No autosaved game found.");
+        return;
+    }
+    try {
+        const data = JSON.parse(raw);
+        loadStateIntoGame(data);
+    } catch (err) {
+        console.error("Autosave load error:", err);
     }
 }

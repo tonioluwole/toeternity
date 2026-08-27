@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>ETERNITY - Superhero RPG</title>
+    <!-- Link Preview Meta Tags -->
+    <meta property="og:title" content="ETERNITY - A D&D inspired RPG">
+    <meta property="og:description" content="A high-fantasy text RPG powered by an AI Game Master.">
+    <meta property="og:image" content="https://toeternity.cloud-ip.cc/static/preview-image-a.png">
+    <meta property="og:url" content="https://toeternity.cloud-ip.cc/">
+    <meta property="og:type" content="website">
+    <title>ETERNITY - A D&D inspired RPG</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="/static/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -84,14 +90,17 @@
         <div style="display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px;">
             <!-- Row 1: Save & Load -->
             <div style="display: flex; gap: 10px;">
-                <button id="save-button" onclick="saveSession()" style="flex: 1; padding: 10px; font-size: 14px;">Save Game</button>
-                <button id="load-button" onclick="loadSession()" style="flex: 1; padding: 10px; font-size: 14px; background: #4b5563;">Load Game</button>
+                <button id="save-button" onclick="exportSaveFile()" style="flex: 1; padding: 10px; font-size: 14px;">Save Game file to PC</button>
+                <button id="load-button" onclick="document.getElementById('file-upload').click()" style="flex: 1; padding: 10px; font-size: 14px; background: #4b5563;">Load Save file from PC</button>
             </div>
             <!-- Row 2: New Game & Main Menu -->
             <div style="display: flex; gap: 10px;">
                 <button onclick="confirmNewGame()" style="flex: 1; padding: 10px; font-size: 14px; background: #991b1b;">New Game</button>
                 <button onclick="goToMainMenu()" style="flex: 1; padding: 10px; font-size: 14px; background: #374151;">Main Menu</button>
             </div>
+            
+            <!-- Hidden File Uploader -->
+            <input type="file" id="file-upload" accept=".json" style="display: none;" onchange="importSaveFile(event)">
         </div>
         
     </div>
@@ -139,7 +148,7 @@
         </p>
         <div style="display: flex; gap: 20px;">
             <button onclick="startNewGame()" style="padding: 15px 30px; font-size: 1.2rem;">New Game</button>
-            <button onclick="loadSession()" style="padding: 15px 30px; font-size: 1.2rem; background-color: #4b5563;">Load Game</button>
+            <button onclick="loadAutosave()" style="padding: 15px 30px; font-size: 1.2rem; background-color: #4b5563;">Load Game</button>
         </div>
     </div>
 

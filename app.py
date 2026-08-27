@@ -5,13 +5,11 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request, Response
 from google import genai
 from google.genai import types
-import requests
 from models import DMResponse
 from google.cloud import texttospeech
 
 load_dotenv()
 
-# This helper function finds files whether running normally or as an .exe
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -20,10 +18,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 ROOT_DIR = resource_path(".")
-DATA_DIR = ROOT_DIR
 MODEL_ID = "gemini-3.1-flash-lite"
-WORLD_FILE = os.path.join(DATA_DIR, "eternity_world.json")
-SAVE_FILE = os.path.join(DATA_DIR, "eternity_save.json")
 
 app = Flask(
     __name__,
@@ -48,8 +43,6 @@ json_path = resource_path("elements.json")
 with open(json_path, "r", encoding="utf-8") as elements_file:
     ELEMENTS = json.load(elements_file)
 
-
-# Hardcoded Path Definitions to ensre strict game mechanics
 CLASS_PATHS = {
     "Kinetic": {
         "Telekinetic Ascendant": [
@@ -121,20 +114,6 @@ CLASS_PATHS = {
     }
 }
 
-def load_world():
-    if os.path.exists(WORLD_FILE):
-        with open(WORLD_FILE, "r") as f:
-            data = json.load(f)
-            # Ensure old save files get the new ledger
-            if "npc_ledger" not in data:
-                data["npc_ledger"] = {} 
-            return data
-    return {"world_age": 1, "major_events": [], "npc_ledger": {}}
-
-def save_world(data):
-    with open(WORLD_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
 SYSTEM_INSTRUCTION = """
 You are the Game Master for 'Eternity', a high-fantasy RPG inspired by the lively, cinematic worlds of Vox Machina and the Mighty Nein. The hero classes are: Kinetic, Vanguard, Elementalist, and Warden.
 
@@ -155,10 +134,11 @@ RULES & MECHANICS:
 2. COMBAT: Adjust difficulty based on clever power use. Track HP logically. If a player is hit, reduce their HP in the 'hero_update'. If HP <= 0, status is 'Dead'. Record their death in 'major_event_summary'.
 3. ELEMENTAL COMBAT: If the hero is an Elementalist, actively factor in their 'primary_element', 'affinity_element', and 'struggle_element'. Give them narrative and mechanical advantages when using affinities, and severe disadvantages/damage penalties when facing their struggle element.
 4. PROGRESSION: Character max HP increases as they level up. When a character overcomes a major challenge or defeats a boss, increment their 'level' by 1. 
-5. ASCENSION: If they reach Level 5, the system will pause and ask them to choose a permanent specialized path. Build narrative anticipation as they approach this milestone.
-6. NPC TRACKING: If the hero interacts with a named NPC, evaluate how the interaction went and output an update in 'npc_updates' detailing their new disposition (e.g., Hostile, Friendly, Suspicious) and a note on what happened.
-7. INVENTORY & CONSUMABLES: The hero has an 'inventory' list. If they find loot, receive a gift, or buy an item, add it to this list. If they use a consumable item (like a Health Potion), you MUST remove it from their inventory list. If a healing item is used, you must mechanically increase their 'hp' up to their 'max_hp' in the 'hero_update'.
-8. ATMOSPHERE: Use the 'atmosphere' JSON field to output exactly one of these six words to describe the current scene's mood: "mystical", "icy", "combat", "darkness", "forest", or "neutral". This drives the game's UI colors.
+5. COMPANION: If the hero has rescued the fairy companion, she travels with them permanently. She should periodically interject with witty commentary, mildly unhelpful advice, or minor magical distractions during the hero's actions to provide comedic relief.
+6. ASCENSION: If they reach Level 5, the system will pause and ask them to choose a permanent specialized path. Build narrative anticipation as they approach this milestone.
+7. NPC TRACKING: If the hero interacts with a named NPC, evaluate how the interaction went and output an update in 'npc_updates' detailing their new disposition (e.g., Hostile, Friendly, Suspicious) and a note on what happened.
+8. INVENTORY & CONSUMABLES: The hero has an 'inventory' list. If they find loot, receive a gift, or buy an item, add it to this list. If they use a consumable item (like a Health Potion), you MUST remove it from their inventory list. If a healing item is used, you must mechanically increase their 'hp' up to their 'max_hp' in the 'hero_update'.
+9. ATMOSPHERE: Use the 'atmosphere' JSON field to output exactly one of these six words to describe the current scene's mood: "mystical", "icy", "combat", "darkness", "forest", or "neutral". This drives the game's UI colors.
 """
 
 @app.route("/")
@@ -172,16 +152,12 @@ def start_game():
     char_class = data.get("class", "Vanguard")
     primary_elem = data.get("element", "").lower()
 
-    world_data = {"world_age": 1, "major_events": [], "npc_ledger": {}}
-    save_world(world_data)
-    
-    # Elemental calculation
+    # Calculate elemental affinity
     aff, strg = None, None
     if char_class == "Elementalist" and primary_elem in ELEMENTS["elemental_wheel"]:
         aff = ELEMENTS["elemental_matrix"][primary_elem]["affinity"]
         strg = ELEMENTS["elemental_matrix"][primary_elem]["struggle"]
 
-    # New Starting Abilities
     abilities = []
     if char_class == "Kinetic": 
         abilities = [
@@ -216,6 +192,7 @@ def start_game():
     initial_char = {
         "name": char_name, "class": char_class, "level": 1,
         "hp": 20, "max_hp": 20, "abilities": abilities, "status": "Alive",
+        "current_chapter": 1, # Track the plot
         "primary_element": primary_elem, "affinity_element": aff, "struggle_element": strg,
         "specialized_path": None,
         "inventory": ["Lesser Healing Potion", "50 Gold Pieces"] 
@@ -236,20 +213,17 @@ def start_game():
         ),
     )
     dm_data = DMResponse.model_validate_json(response.text)
-    # 1. Convert the Pydantic model to a standard dictionary first
     char_dict = dm_data.hero_update.model_dump(by_alias=True)
     
-    # 2. Re-inject the elemental variables so Pydantic doesn't hide them from your frontend
     if char_class == "Elementalist":
         char_dict["primary_element"] = primary_elem
         char_dict["affinity_element"] = aff
         char_dict["struggle_element"] = strg
 
-    # 3. Send the updated dictionary to JavaScript
     return jsonify({
         "character": char_dict, 
         "story": dm_data.narrative,
-        "npc_ledger": world_data["npc_ledger"],
+        "npc_ledger": {},
         "atmosphere": dm_data.atmosphere
     })
 
@@ -259,17 +233,13 @@ def generate_voice():
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
-    # 1. Load the credentials securely from Vercel
     creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     if not creds_json:
         return jsonify({"error": "Missing Google credentials"}), 500
         
     creds_dict = json.loads(creds_json)
-    
-    # 2. Authenticate the client using the dictionary
     client = texttospeech.TextToSpeechClient.from_service_account_info(creds_dict)
 
-    # 3. Configure the Journey voice (e.g., a deep, cinematic male voice)
     synthesis_input = texttospeech.SynthesisInput(text=text)
     voice = texttospeech.VoiceSelectionParams(
         language_code="en-GB",
@@ -279,7 +249,6 @@ def generate_voice():
         audio_encoding=texttospeech.AudioEncoding.MP3
     )
 
-    # 4. Generate and return the audio
     try:
         response = client.synthesize_speech(
             input=synthesis_input, voice=voice, audio_config=audio_config
@@ -289,30 +258,40 @@ def generate_voice():
         print(f"Google TTS Error: {e}")
         return jsonify({"error": "Failed to generate voice"}), 500
 
+PLOT_POINTS = {
+    1: "The Awakening: The hero awakens in a crumbling underground ruin with no memory of how they got there. They must explore the room and retrieve a pulsing artifact called the Aether Core from a trapped stone pedestal. Set 'chapter_complete' to true ONLY when the hero successfully survives the trap and the Aether Core is explicitly added to their inventory.",
+    2: "The Shadow Ambush: The hero exits the ruins and travels through a dense, foggy forest toward the nearest town. They must be ambushed by a pack of feral Shadow-Hounds hunting the Core. Set 'chapter_complete' to true ONLY when the hero defeats or outruns the pack and physically passes through the safe gates of the town.",
+    3: "The Glimmering Nuisance: The hero spots a sarcastic, fast-talking female fairy trapped inside a glass lantern held by a wandering scavenger. She provides comedic relief and demands to be rescued. Set 'chapter_complete' to true ONLY when the hero frees her and she formally tags along as a companion.",
+    4: "The Prism Mechanism: The hero must find an eccentric scholar in the town to examine the Aether Core. To open it, the hero must solve a mechanical puzzle by rotating three large crystal lenses to mix red, blue, and green light beams into a focused white beam. The fairy should offer terribly unhelpful puzzle advice. Set 'chapter_complete' to true ONLY when the light beams are aligned correctly and the Core unlocks.",
+    5: "The Betrayal: The unlocked Core projects a holographic map to the World-Forge, but the scholar betrays the hero, stealing the map and summoning two heavy elemental golems to cover their escape. Set 'chapter_complete' to true ONLY when the hero destroys both golems and finds the scholar's escape trail.",
+    6: "The World-Forge Climax: The hero tracks the scholar to the World-Forge. They must engage in a final boss battle to stop the scholar from plugging the Aether Core into the forge's main terminal, which would shatter the continent. Set 'chapter_complete' to true ONLY when the scholar is defeated and the hero physically unplugs or destroys the Aether Core.",
+    7: "The Legacy: The main quest is over. Allow the player to freely explore the world, take on local guild bounties, and build their legacy."
+}
 
 @app.route("/api/action", methods=["POST"])
 def process_action():
     data = request.json
-    world_data = load_world()
     
-    # 1. Extract and format the short-term memory buffer
     history = data.get("history", [])
     history_text = "No recent events."
     if history:
         history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history])
     
-    # 2. Extract known NPCs
-    known_npcs = json.dumps(world_data.get("npc_ledger", {}))
+    npc_ledger = data.get("npc_ledger", {})
+    known_npcs = json.dumps(npc_ledger)
     
-    # 3. Inject memory and NPCs into the prompt
+    # --- NEW: Plot Tracking ---
+    current_chapter = data['character'].get('current_chapter', 1)
+    chapter_goal = PLOT_POINTS.get(current_chapter, "Survive and explore the world. (Free Roam)")
+    
     prompt = (
         f"Hero State: {json.dumps(data['character'])}\n"
         f"Recent Events (Short-Term Memory):\n{history_text}\n"
         f"Known NPCs (Disposition & Notes):\n{known_npcs}\n\n"
+        f"CURRENT PLOT OBJECTIVE (Steer the narrative toward this): {chapter_goal}\n\n"
         f"Action: '{data['action']}'\n"
-        "Evaluate action, roll d20, apply rules, update state. If interacting with a named NPC, update their standing in 'npc_updates'."
+        "Evaluate action, roll d20, apply rules, update state. If interacting with a named NPC, update their standing in 'npc_updates'. If the player achieves the CURRENT PLOT OBJECTIVE, set 'chapter_complete' to true."
     )
-    
     
     client = get_gemini_client()
     if client is None:
@@ -329,16 +308,20 @@ def process_action():
     dm_data = DMResponse.model_validate_json(response.text)
     char_dict = dm_data.hero_update.model_dump(by_alias=True)
 
-    # --- NEW: Process and save NPC updates silently ---
+    # Process and update NPC ledger in-memory for this client response
     if dm_data.npc_updates:
         for npc in dm_data.npc_updates:
-            world_data["npc_ledger"][npc.name] = {
+            npc_ledger[npc.name] = {
                 "disposition": npc.disposition,
                 "notes": npc.notes
             }
-        save_world(world_data) # Save the updated ledger to the world file immediately
 
-    # Check for Level 5 Ascension Trigger
+    # --- NEW: Advance the Chapter ---
+    if getattr(dm_data, 'chapter_complete', False):
+        char_dict['current_chapter'] = current_chapter + 1
+    else:
+        char_dict['current_chapter'] = current_chapter
+
     path_choices = None
     if char_dict["level"] >= 5 and not char_dict.get("specialized_path"):
         class_name = char_dict["class"]
@@ -348,7 +331,6 @@ def process_action():
             primary_elem = char_dict.get("primary_element", "").lower()
             allowed_paths = {}
             
-            # Map the 8 core elements to their specific paradox fusions
             element_to_fusion = {
                 "light": "Singularity Ascendant", "dark": "Singularity Ascendant",
                 "plant": "Bio-Electric Ascendant", "electricity": "Bio-Electric Ascendant",
@@ -356,28 +338,24 @@ def process_action():
                 "water": "Steam Ascendant", "fire": "Steam Ascendant"
             }
             
-            # Offer only their specific destined fusion
             fusion_path = element_to_fusion.get(primary_elem)
             if fusion_path and fusion_path in all_paths:
                 allowed_paths[fusion_path] = all_paths[fusion_path]
                 
             path_choices = allowed_paths
-            
         else:
             path_choices = all_paths
 
     is_dead = char_dict["status"].lower() == "dead" or char_dict["hp"] <= 0
     if is_dead:
         char_dict["hp"], char_dict["status"] = 0, "Dead"
-        world_data["major_events"].append(dm_data.major_event_summary or f"{char_dict['name']} died.")
-        save_world(world_data)
 
     return jsonify({
         "character": char_dict, 
         "narrative": dm_data.narrative, 
         "is_dead": is_dead, 
         "path_choices": path_choices,
-        "npc_ledger": world_data.get("npc_ledger", {}),
+        "npc_ledger": npc_ledger,
         "atmosphere": dm_data.atmosphere
     })
 
@@ -387,14 +365,11 @@ def choose_path():
     char = data.get("character")
     chosen_path = data.get("path")
     
-    # Apply permanent upgrades
     char["specialized_path"] = chosen_path
     new_abilities = CLASS_PATHS[char["class"]][chosen_path]
     char["abilities"].extend(new_abilities)
     
     extra_narrative = ""
-    
-    # --- NEW: Grant the second element for Elementalists ---
     if char["class"] == "Elementalist":
         fusion_to_elements = {
             "Singularity Ascendant": ["light", "dark"],
@@ -406,35 +381,13 @@ def choose_path():
         if chosen_path in fusion_to_elements:
             pair = fusion_to_elements[chosen_path]
             primary = char.get("primary_element", "").lower()
-            
-            # Find which element of the pair they DON'T have yet
             secondary = pair[1] if pair[0] == primary else pair[0]
             char["secondary_element"] = secondary
-            
             extra_narrative = f" You have also unlocked complete mastery over {secondary.capitalize()}!"
     
     narrative = f"\n\n*** You have ascended. The power of the {chosen_path} surges through you.{extra_narrative} New abilities have been permanently unlocked. ***\n"
     
     return jsonify({"character": char, "narrative": narrative})
-
-@app.route("/api/save_game", methods=["POST"])
-def save_game_state():
-    data = request.json
-    with open(SAVE_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-    return jsonify({"status": "success"})
-
-@app.route("/api/load_game", methods=["GET"])
-def load_game_state():
-    world_data = load_world()
-    if os.path.exists(SAVE_FILE):
-        with open(SAVE_FILE, "r") as f:
-            data = json.load(f)
-            data["npc_ledger"] = world_data.get("npc_ledger", {})
-            return jsonify({"status": "success", "data": data})
-    return jsonify({"status": "error", "message": "No save file found."})
-
-
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

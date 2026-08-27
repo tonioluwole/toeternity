@@ -9,6 +9,7 @@ class HeroPowerState(BaseModel):
     name: str
     power_class: str = Field(alias='class')
     level: int = Field(default=1)
+    current_chapter: int = Field(default=1)
     primary_element: Optional[str] = Field(default=None)
     affinity_element: Optional[str] = Field(default=None)
     struggle_element: Optional[str] = Field(default=None)
@@ -19,7 +20,6 @@ class HeroPowerState(BaseModel):
     inventory: List[str] = Field(default=[])
     status: str = Field(default='Alive')
 
-    # --- NEW: NPC Relationship Schema ---
 class NPCRelationship(BaseModel):
     name: str = Field(description="The name of the NPC.")
     disposition: str = Field(description="e.g., Friendly, Hostile, Suspicious, Indebted, Terrified")
@@ -32,7 +32,8 @@ class DMResponse(BaseModel):
     unlocked_path_choice: Optional[List[str]] = Field(default=None)
     major_event_summary: str = Field(default="")
     npc_updates: Optional[List[NPCRelationship]] = Field(default=None)
+    chapter_complete: bool = Field(default=False, description="Set to true ONLY if the player completes the CURRENT PLOT OBJECTIVE.")
     atmosphere: str = Field(
-        default="default",
-        description="The visual mood of the current scene. Must be exactly one of: 'default', 'combat', 'mystical', or 'icy'."
+        default="neutral",
+        description="The visual mood of the current scene. Must be exactly one of: 'mystical', 'icy', 'combat', 'darkness', 'forest', or 'neutral'."
     )
