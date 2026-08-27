@@ -7,3 +7,6 @@ Eternity Alpha.zip
 # Local Save Data
 eternity_save.json
 eternity_world.json
+
+__pycache__/
+*.pyc
