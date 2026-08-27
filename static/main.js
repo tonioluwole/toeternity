@@ -291,7 +291,14 @@ function updateUI() {
             characterState.inventory.forEach(item => {
                 let li = document.createElement('li');
                 li.className = 'inventory-item';
-                li.innerText = item;
+                
+                // Tag items that can be eaten/drank
+                const isConsumable = item.toLowerCase().match(/(potion|pizza|shawarma|apple)/);
+                if (isConsumable) {
+                    li.innerHTML = `${item} <button onclick="useItem('${item}')" style="padding: 2px 6px; font-size: 0.7em; margin-left: 10px;">Use</button>`;
+                } else {
+                    li.innerText = item;
+                }
                 invList.appendChild(li);
             });
         } else {
@@ -300,6 +307,25 @@ function updateUI() {
             li.innerText = 'Backpack is empty';
             invList.appendChild(li);
         }
+    }
+}
+
+async function useItem(itemName) {
+    const res = await fetch('/api/consume', {
+        method: 'POST',
+        headers: apiHeaders(),
+        body: JSON.stringify({ character: characterState, item: itemName })
+    });
+    
+    if (res.ok) {
+        const data = await res.json();
+        characterState = data.character;
+        updateUI();
+        
+        const log = document.getElementById('story-log');
+        log.innerHTML += data.narrative;
+        log.scrollTop = log.scrollHeight;
+        autoSaveGame();
     }
 }
 
@@ -362,15 +388,20 @@ async function sendAction() {
         log.innerHTML += `\n<div class="roll-badge ${rollClass}">🎲 Roll: ${data.d20_roll} (${rollText})</div>\n\n`;
     }
 
-    // 4. Update the short-term memory buffer immediately
+    // 4. Update the short-term memory buffer (Garbage Collection)
     chatHistory.push({ role: "Hero", content: action });
     chatHistory.push({ role: "Game Master", content: data.narrative.replace(/\*/g, '') });
-    if (chatHistory.length > 10) {
-        chatHistory = chatHistory.slice(chatHistory.length - 10);
+    if (chatHistory.length > 6) {
+        chatHistory = chatHistory.slice(chatHistory.length - 6);
     }
 
-    // 5. Trigger audio before typing starts
-    speakDM(data.narrative.replace(/\*/g, ''));
+    // 5. Fire Audio Asynchronously 
+    // Pushing this to the back of the event loop ensures it never blocks the DOM
+    setTimeout(() => {
+        if (typeof speakDM === 'function') {
+            speakDM(data.narrative.replace(/\*/g, ''));
+        }
+    }, 0);
 
     // 6. Fast Typewriter Effect & End-of-Turn Checks
     const textContainer = document.createElement('span');
@@ -410,6 +441,20 @@ async function sendAction() {
     }
     
     typeWriter();
+}
+
+function showJournal() {
+    const journalContent = document.getElementById('journal-content');
+    
+    if (characterState && characterState.campaign_summary) {
+        // Render the AI's long-term memory
+        journalContent.innerText = characterState.campaign_summary;
+    } else {
+        // Fallback for new games
+        journalContent.innerText = "The pages are blank. Your legend has just begun.";
+    }
+    
+    document.getElementById('journal-modal').style.display = 'flex';
 }
 
 function showPathModal(choices) {
@@ -456,32 +501,39 @@ async function selectPath(pathName) {
 
 function setAtmosphere(mood) {
     const root = document.documentElement;
-    
-    // Update the UI text badge
     const moodIndicator = document.getElementById('mood-indicator');
-    if (moodIndicator) {
-        moodIndicator.innerText = mood;
-    }
-    
+    if (moodIndicator) moodIndicator.innerText = mood;
+
     if (mood === 'mystical') {
-        root.style.setProperty('--panel-bg', '#2d1b4e'); // Muted deep purple
-        root.style.setProperty('--accent-color', '#ffd700'); // Gold
+        root.style.setProperty('--panel-bg', 'rgba(45, 27, 78, 0.85)');
+        root.style.setProperty('--accent-color', '#ffd700'); 
+        root.style.setProperty('--wash-top-left', 'rgba(128, 0, 128, 0.25)'); // Purple
+        root.style.setProperty('--wash-side-right', 'rgba(255, 215, 0, 0.15)'); // Gold
+        
     } else if (mood === 'icy') {
-        root.style.setProperty('--panel-bg', '#1e293b'); // Slate blue
-        root.style.setProperty('--accent-color', '#00ffff'); // Cyan
+        root.style.setProperty('--panel-bg', 'rgba(30, 41, 59, 0.85)');
+        root.style.setProperty('--accent-color', '#00ffff'); 
+        root.style.setProperty('--wash-top-left', 'rgba(0, 0, 255, 0.2)'); // Blue
+        root.style.setProperty('--wash-side-right', 'rgba(0, 255, 255, 0.2)'); // Cyan
+        
     } else if (mood === 'combat') {
-        root.style.setProperty('--panel-bg', '#3f0f0f'); // Muted dark red
-        root.style.setProperty('--accent-color', '#ff4444'); // Bright red
-    } else if (mood === 'darkness') {
-        root.style.setProperty('--panel-bg', '#121212'); // Very dark grey
-        root.style.setProperty('--accent-color', '#ffffff'); // Pure white
+        root.style.setProperty('--panel-bg', 'rgba(63, 15, 15, 0.85)');
+        root.style.setProperty('--accent-color', '#ff4444'); 
+        root.style.setProperty('--wash-top-left', 'rgba(255, 0, 0, 0.25)'); // Harsh Red
+        root.style.setProperty('--wash-side-right', 'rgba(244, 253, 255, 0.12)'); // Cool White
+        
     } else if (mood === 'forest') {
-        root.style.setProperty('--panel-bg', '#0f3322'); // Muted jungle green
-        root.style.setProperty('--accent-color', '#4ade80'); // Vibrant toxic green
+        root.style.setProperty('--panel-bg', 'rgba(15, 51, 34, 0.85)');
+        root.style.setProperty('--accent-color', '#4ade80'); 
+        root.style.setProperty('--wash-top-left', 'rgba(255, 105, 180, 0.2)'); // Pink
+        root.style.setProperty('--wash-side-right', 'rgba(255, 165, 0, 0.15)'); // Orange
+        
     } else {
-        // Default resets (Neutral)
-        root.style.setProperty('--panel-bg', '#1f2937'); // Default UI gray
-        root.style.setProperty('--accent-color', '#3b82f6'); // Standard blue
+        // Default Neutral Wash
+        root.style.setProperty('--panel-bg', 'rgba(31, 41, 55, 0.95)');
+        root.style.setProperty('--accent-color', '#3b82f6');
+        root.style.setProperty('--wash-top-left', 'rgba(59, 130, 246, 0.1)');
+        root.style.setProperty('--wash-side-right', 'transparent');
     }
 }
 

@@ -87,6 +87,14 @@
 
         <div class="divider"></div>
 
+        <!-- Add this inside your sidebar, right above the Save/Load buttons -->
+        
+        <button onclick="showJournal()" style="width: 100%; padding: 10px; font-size: 14px; background: #4b5563; margin-bottom: 15px;">
+            📖 View Adventure Journal
+        </button>
+
+        <div class="divider"></div>
+
         <div style="display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px;">
             <!-- Row 1: Save & Load -->
             <div style="display: flex; gap: 10px;">
@@ -136,6 +144,18 @@
             <!-- Make sure name matches image file -->
             <img src="/static/elementalwheel.png" alt="Elemental Wheel" style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
         </div>
+    </div>
+
+    <!-- Journal Modal -->
+    <div id="journal-modal" class="modal" style="display: none;">
+        <h1 style="color: var(--accent-color); margin-bottom: 15px;">CAMPAIGN JOURNAL</h1>
+        <p style="color: #9ca3af; margin-bottom: 20px;">The story so far...</p>
+        
+        <div id="journal-content" style="width: 90vw; max-width: 600px; max-height: 50vh; overflow-y: auto; text-align: left; background: #1f2937; padding: 20px; border-radius: 8px; border: 1px solid #4b5563; color: #e2e8f0; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap;">
+            <!-- Content injected via JS -->
+        </div>
+        
+        <button onclick="document.getElementById('journal-modal').style.display='none'" style="padding: 12px 30px; font-size: 1rem;">Close Journal</button>
     </div>
 
     <!-- Start Menu Modal -->

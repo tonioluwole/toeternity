@@ -139,7 +139,23 @@ RULES & MECHANICS:
 7. ASCENSION: If they reach Level 5, the system will pause and ask them to choose a permanent specialized path. Build narrative anticipation as they approach this milestone.
 8. NPC TRACKING: If the hero interacts with a named NPC, evaluate how the interaction went and output an update in 'npc_updates' detailing their new disposition (e.g., Hostile, Friendly, Suspicious) and a note on what happened.
 9. ATMOSPHERE: Use the 'atmosphere' JSON field to output exactly one of these six words to describe the current scene's mood: "mystical", "icy", "combat", "darkness", "forest", or "neutral". This drives the game's UI colors.
+10. MEMORY: Always update the 'campaign_summary' field in your response to maintain a concise, running log of major defeated enemies, solved puzzles, or key narrative decisions. Drop mundane combat turns.
 """
+NPC_ROUTING_RULES = {
+    "Scavenger": """
+    Evaluate player action against this strict decision logic flowchart:
+    - IF player offers 30 Gold Pieces or more -> Route to Node A: Scavenger accepts payment, hands over Gogo's lantern, Disposition becomes 'Friendly'.
+    - IF player threatens physical violence -> Route to Node B: Scavenger panics, drops the lantern, and flees. Disposition becomes 'Hostile'.
+    - ELSE -> Route to Node C: Scavenger refuses the request and demands exactly 50 gold pieces.
+    """,
+
+    "Crow": """
+    Evaluate player action against this strict decision logic flowchart:
+    - IF player threatens Crow or tries to steal the puzzle pieces -> Route to Node A: Crow summons a minor mechanical familiar to defend himself, refuses to help, and Disposition becomes 'Hostile'.
+    - IF player successfully delivers the three rare reagents -> Route to Node B: Crow becomes ecstatic, eagerly unlocks the puzzle mechanism, and Disposition becomes 'Friendly'.
+    - ELSE -> Route to Node C: Crow acts erratic and distracted, refusing to focus on the Aether Core until he gets his reagents.
+    """
+}
 
 @app.route("/")
 def index():
@@ -195,7 +211,8 @@ def start_game():
         "current_chapter": 1,
         "primary_element": primary_elem, "affinity_element": aff, "struggle_element": strg,
         "specialized_path": None,
-        "inventory": ["Lesser Healing Potion", "50 Gold Pieces"] 
+        "inventory": ["Lesser Healing Potion", "50 Gold Pieces"],
+        "campaign_summary": "The hero awakens in the ruins, remembering nothing."
     }
 
     chapter_1_goal = PLOT_POINTS[1]
@@ -267,9 +284,9 @@ PLOT_POINTS = {
     1: "The Awakening: The hero awakens in a crumbling underground ruin with severe amnesia. To escape the initial chamber, they must systematically search the rubble for a hidden toolkit, bypass a rigged pressure-plate trap on the heavy stone exit door, and pry it open. Set 'chapter_complete' to true ONLY when the trap is safely disarmed, the door is opened, and the hero steps out into the outer catacombs.",
     2: "The Shadow Ambush: The hero navigates the winding, dark catacombs leading toward the surface. They are tracked and ambushed by a pack of feral Shadow-Hounds. They must manage their resources, fend off waves of beasts, and locate the hidden stairway leading up to the surface forest. Set 'chapter_complete' to true ONLY when the hound pack is defeated or evaded and the hero reaches the forest edge.",
     3: "The Glimmering Nuisance: Emerging into the forest, the hero spots a sarcastic, fast-talking female fairy named Gogo trapped inside a glass lantern held by a suspicious wandering scavenger. They must negotiate, intimidate, or fight the scavenger to free her. Set 'chapter_complete' to true ONLY when Gogo is successfully freed and officially joins the party as a companion.",
-    4: "The Prism Mechanism: The hero travels to the nearest frontier town and tracks down an eccentric scholar who knows about the Aether Core. To get answers, the hero must help the scholar gather three rare reagents from the town market and solve a complex multi-tiered crystal light puzzle. Set 'chapter_complete' to true ONLY when all reagents are delivered, the light puzzle is solved, and the Core unlocks.",
-    5: "The Betrayal: The unlocked Core projects a holographic map to the World-Forge, but the scholar betrays the hero, stealing the map, triggering a security lockdown, and summoning two heavy elemental golems. The hero must fight through the golems and disable the room's magical lockdown. Set 'chapter_complete' to true ONLY when the golems are destroyed, the lockdown is bypassed, and the scholar's escape trail is found.",
-    6: "The World-Forge Climax: The hero tracks the scholar across hazardous terrain to the heart of the World-Forge for an intense, multi-phase boss battle to prevent the continent from shattering. Set 'chapter_complete' to true ONLY when the boss is beaten and the Aether Core is secured.",
+    4: "The Prism Mechanism: The hero travels to the nearest frontier town and tracks down an eccentric scholar named Crow who knows about the Aether Core. To get answers, the hero must help Crow gather three rare reagents from the town market and solve a complex multi-tiered crystal light puzzle. Set 'chapter_complete' to true ONLY when all reagents are delivered, the light puzzle is solved, and the Core unlocks.",
+    5: "The Betrayal: The unlocked Core projects a holographic map to the World-Forge, but Crow betrays the hero, stealing the map, triggering a security lockdown, and summoning two heavy elemental golems. The hero must fight through the golems and disable the room's magical lockdown. Set 'chapter_complete' to true ONLY when the golems are destroyed, the lockdown is bypassed, and Crow's escape trail is found.",
+    6: "The World-Forge Climax: The hero tracks Crow across hazardous terrain to the heart of the World-Forge for an intense, multi-phase boss battle to prevent the continent from shattering. Set 'chapter_complete' to true ONLY when Crow is beaten and the Aether Core is secured.",
     7: "The Legacy: The main quest is over. Allow the player to freely explore the world, take on local guild bounties, and build their legacy."
 }
 
@@ -289,13 +306,21 @@ def process_action():
     current_chapter = data['character'].get('current_chapter', 1)
     chapter_goal = PLOT_POINTS.get(current_chapter, "Survive and explore the world. (Free Roam)")
     
+    # Inject routing rules if the NPC is in the current known ledger
+    active_routing = ""
+    for npc_name in NPC_ROUTING_RULES:
+        if npc_name in npc_ledger or npc_name in data['action']:
+            active_routing += f"\nROUTING RULES FOR {npc_name}: {NPC_ROUTING_RULES[npc_name]}"
+    
     prompt = (
         f"Hero State: {json.dumps(data['character'])}\n"
+        f"The Story So Far (Long-Term Memory):\n{data['character'].get('campaign_summary', '')}\n\n"
         f"Recent Events (Short-Term Memory):\n{history_text}\n"
-        f"Known NPCs (Disposition & Notes):\n{known_npcs}\n\n"
-        f"CURRENT PLOT OBJECTIVE (Steer the narrative toward this): {chapter_goal}\n\n"
+        f"Known NPCs:\n{known_npcs}\n"
+        f"{active_routing}\n\n"
+        f"CURRENT PLOT OBJECTIVE: {chapter_goal}\n\n"
         f"Action: '{data['action']}'\n"
-        "Evaluate action, roll d20, apply rules, update state. If interacting with a named NPC, update their standing in 'npc_updates'. If the player achieves the CURRENT PLOT OBJECTIVE, set 'chapter_complete' to true."
+        "Evaluate action, roll d20, apply rules, update state."
     )
     
     client = get_gemini_client()
@@ -394,6 +419,22 @@ def choose_path():
     narrative = f"\n\n*** You have ascended. The power of the {chosen_path} surges through you.{extra_narrative} New abilities have been permanently unlocked. ***\n"
     
     return jsonify({"character": char, "narrative": narrative})
+
+@app.route("/api/consume", methods=["POST"])
+def consume_item():
+    data = request.json
+    char = data.get("character")
+    item = data.get("item")
+    
+    if item in char["inventory"]:
+        char["inventory"].remove(item)
+        heal_amount = 15
+        char["hp"] = min(char["max_hp"], char["hp"] + heal_amount)
+        
+        narrative = f"\n\n*** You quickly consume the {item}, restoring {heal_amount} HP. ***\n"
+        return jsonify({"character": char, "narrative": narrative})
+    
+    return jsonify({"error": "Item not found"}), 400
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

@@ -37,3 +37,4 @@ class DMResponse(BaseModel):
         default="neutral",
         description="The visual mood of the current scene. Must be exactly one of: 'mystical', 'icy', 'combat', 'darkness', 'forest', or 'neutral'."
     )
+    campaign_summary: str = Field(default="")

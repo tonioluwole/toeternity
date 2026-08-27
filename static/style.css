@@ -1,11 +1,13 @@
 :root {
     --bg-color: #02000a;
-    --panel-bg: #001c53;
+    --panel-bg: rgba(0, 28, 83, 0.85);
     --text-color: #ffffff;
     --accent-color: #08e7f7;
+    --wash-top-left: rgba(59, 130, 246, 0.1);
+    --wash-side-right: transparent;
     --accent-color2: white;
     --danger-color: #ef4444;
-    --border-color: #2d3748;
+    --border-color: rgba(45, 55, 72, 0.5);
 }
 
 
@@ -23,6 +25,11 @@ body {
     background-color: var(--bg-color); color: var(--text-color);
     font-family: 'Google Sans';
     margin: 0; display: flex; height: 100vh;
+    background-image: 
+        radial-gradient(circle at 15% 0%, var(--wash-top-left) 0%, transparent 45%),
+        radial-gradient(circle at 85% 20%, var(--wash-side-right) 0%, transparent 55%);
+    background-attachment: fixed;
+    transition: background-image 1.5s ease-in-out, background-color 1.5s ease-in-out;
 }
 
 h2, h3 { color: var(--accent-color); margin-top: 0; margin-bottom: 10px; }
