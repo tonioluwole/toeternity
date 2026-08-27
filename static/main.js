@@ -23,7 +23,7 @@ function renderChapterBanner(chapterNum) {
 }
 
 async function speakDM(text) {
-    if (!voiceEnabled || !text) return;
+    if (!text) return;
     
     // Stop browser TTS and active audio immediately
     window.speechSynthesis.cancel();
@@ -32,6 +32,8 @@ async function speakDM(text) {
         currentDMAudio.currentTime = 0;
     }
 
+    let serverAudioSucceeded = false;
+
     try {
         const response = await fetch('/api/voice', {
             method: 'POST',
@@ -39,21 +41,24 @@ async function speakDM(text) {
             body: JSON.stringify({ text: text })
         });
 
-        if (response.ok && voiceEnabled) { // Double check mute state after fetch
+        if (response.ok) {
             const blob = await response.blob();
             const audioUrl = URL.createObjectURL(blob);
             currentDMAudio = new Audio(audioUrl);
+            
+            // Set volume based on current mute state
+            currentDMAudio.volume = voiceEnabled ? 1.0 : 0.0;
             currentDMAudio.play();
-        } else {
-            throw new Error("Server voice generation failed");
+            serverAudioSucceeded = true;
         }
     } catch (error) {
-        console.error("Voice Error, falling back to browser TTS:", error);
-        // Only use fallback if voice is still enabled
-        if (voiceEnabled) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            window.speechSynthesis.speak(utterance);
-        }
+        console.warn("Server voice generation failed, falling back to browser TTS:", error);
+    }
+
+    // Browser fallback only plays if voiceEnabled is true
+    if (!serverAudioSucceeded && voiceEnabled) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(utterance);
     }
 }
 
@@ -63,14 +68,17 @@ function toggleMute() {
     
     if (voiceEnabled) {
         muteBtn.innerText = '🔊 Mute';
+        // Restore volume if audio is currently playing
+        if (currentDMAudio) {
+            currentDMAudio.volume = 1.0;
+        }
     } else {
         muteBtn.innerText = '🔇 Unmute';
-        // Instantly cut off both browser TTS and server audio streams
-        window.speechSynthesis.cancel();
+        // Drop volume to 0 instantly without pausing or destroying the track
         if (currentDMAudio) {
-            currentDMAudio.pause();
-            currentDMAudio.currentTime = 0;
+            currentDMAudio.volume = 0.0;
         }
+        window.speechSynthesis.cancel();
     }
 }
 
@@ -83,25 +91,40 @@ let chatHistory = [];
 const GEMINI_KEY_STORAGE = "eternity_gemini_api_key";
 const GEMINI_KEY_URL = "https://ai.google.dev/gemini-api/docs/api-key";
 
-function ensureGeminiApiKey() {
-    let key = sessionStorage.getItem(GEMINI_KEY_STORAGE);
-    if (key) return key;
+// Global resolver for the API key promise
+let apiKeyResolver = null;
 
-    key = (prompt(
-        "This game needs your own Google Gemini API key.\n\n" +
-        "1. Open https://ai.google.dev/gemini-api/docs/api-key (a tab should already be open)\n" +
-        "2. Sign in and create an API key\n" +
-        "3. Paste the key here\n\n" +
-        "The key stays in this browser tab only and is sent to the Game Master server for your session."
-    ) || "").trim();
+function ensureGeminiApiKey() {
+    return new Promise((resolve) => {
+        let key = sessionStorage.getItem(GEMINI_KEY_STORAGE);
+        if (key) {
+            resolve(key);
+            return;
+        }
+
+        // Store the resolver and show the custom modal
+        apiKeyResolver = resolve;
+        document.getElementById('apikey-modal').style.display = 'flex';
+    });
+}
+
+function submitApiKey() {
+    const input = document.getElementById('apikey-input');
+    const key = input ? input.value.trim() : "";
 
     if (!key) {
-        alert("A Gemini API key is required to play. Get one at " + GEMINI_KEY_URL);
-        return null;
+        alert("Please enter a valid Gemini API key to continue.");
+        return;
     }
 
     sessionStorage.setItem(GEMINI_KEY_STORAGE, key);
-    return key;
+    input.value = ""; // Clear password field
+    document.getElementById('apikey-modal').style.display = 'none';
+
+    if (apiKeyResolver) {
+        apiKeyResolver(key);
+        apiKeyResolver = null;
+    }
 }
 
 function apiHeaders(extra) {
@@ -113,65 +136,68 @@ function apiHeaders(extra) {
 const classDescriptions = {
     "Kinetic": "A psychic hero who uses the power of their mind to throw objects, build forcefields, and control enemies.",
     "Vanguard": "A superhuman brawler who relies on extreme physical speed, giant size, and unbreakable toughness.",
-    "Elementalist": "A master of natural forces who attacks and defends using blasts of fire, water, earth, and lightning.",
+    "Elementalist": "A master of natural forces who attacks and defends using blasts of fire, water, earth, and more.",
     "Warden": "A fierce shape-shifter who can command explosive plant growth and transform into deadly wild animals."
 };
 
+// Toggle element dropdown if Elementalist is chosen in modal
+function toggleElementSelector() {
+    const classVal = document.getElementById('hero-class-select').value;
+    const elemContainer = document.getElementById('element-container');
+    if (elemContainer) {
+        elemContainer.style.display = classVal === 'Elementalist' ? 'block' : 'none';
+    }
+}
 
+// Triggered when clicking "New Game" from the main menu
 async function startNewGame() {
     console.log("[Step 1] startNewGame triggered");
-    if (!ensureGeminiApiKey()) return;
-    document.getElementById('start-modal').style.display = 'none';
+    const key = await ensureGeminiApiKey();
+    if (!key) return;
 
-    const name = prompt("Enter Hero Name:", "Vaughn") || "Wanderer";
-    console.log("[Step 2] Name chosen:", name);
-    
-    let classChoice = "";
-    while (!["1","2","3","4"].includes(classChoice)) {
-        classChoice = prompt("Choose Class:\n1. Kinetic: A psychic hero who uses the power of their mind to throw objects, build forcefields, and control enemies.\n\n2. Vanguard: A superhuman brawler who relies on extreme physical speed, giant size, and unbreakable toughness.\n\n3. Elementalist: A master of natural forces who attacks and defends using blasts of fire, water, earth, and lightning.\n\n4. Warden: A fierce shape-shifter who can command explosive plant growth and transform into deadly wild animals.", "2");
+    document.getElementById('start-modal').style.display = 'none';
+    const creationModal = document.getElementById('creation-modal');
+    if (creationModal) {
+        creationModal.style.display = 'flex';
+    } else {
+        submitCharacterCreation();
     }
-    
-    const classes = {"1": "Kinetic", "2": "Vanguard", "3": "Elementalist", "4": "Warden"};
-    const charClass = classes[classChoice];
-    console.log("[Step 3] Class chosen:", charClass);
-    
-    let element = "";
-    if (charClass === "Elementalist") {
-        const wheel = ["fire", "air", "electricity", "light", "water", "plant", "earth", "dark"];
-        // Safeguarded in case the prompt returns null
-        while (!element || !wheel.includes(element.toLowerCase())) {
-            element = prompt(`Choose Primary Element (${wheel.join(", ")}):`, "fire") || "fire";
-        }
-    }
-    console.log("[Step 4] Element chosen:", element);
+}
+
+// Triggered when clicking "Begin Journey" inside the creation modal
+async function submitCharacterCreation() {
+    const nameInput = document.getElementById('hero-name-input');
+    const classSelect = document.getElementById('hero-class-select');
+    const elementSelect = document.getElementById('hero-element-select');
+
+    const name = nameInput ? (nameInput.value || "Wanderer").trim() : "Wanderer";
+    const charClass = classSelect ? classSelect.value : "Vanguard";
+    const element = elementSelect ? elementSelect.value.toLowerCase() : "fire";
+
+    const creationModal = document.getElementById('creation-modal');
+    if (creationModal) creationModal.style.display = 'none';
 
     const log = document.getElementById('story-log');
     log.innerText = "Forging world...\n";
     
-    // Safeguarded in case the global variable got deleted
     if (typeof chatHistory === 'undefined') {
         window.chatHistory = [];
     } else {
         chatHistory = []; 
     }
-    
-    console.log("[Step 5] UI prepped, sending fetch request to Python...");
 
     try {
         const res = await fetch('/api/start_game', {
             method: 'POST',
             headers: apiHeaders(),
-            body: JSON.stringify({ name: name, class: charClass, element: element.toLowerCase() })
+            body: JSON.stringify({ name: name, class: charClass, element: element })
         });
         
-        console.log("[Step 6] Python responded! Status:", res.status);
-
         if (!res.ok) {
             throw new Error(`Server Error: ${res.status}`);
         }
 
         const data = await res.json();
-        console.log("[Step 7] JSON parsed successfully:", data);
         
         characterState = data.character;
         updateUI();
@@ -180,22 +206,16 @@ async function startNewGame() {
             updateNPCs(data.npc_ledger); 
         }
 
-        // --- NEW: Change the atmosphere based on the DM's output ---
         if (data.atmosphere) {
             setAtmosphere(data.atmosphere);
         }
-        console.log("[Step 8] UI updated on screen");
         
-        // Render banner and story once
         log.innerHTML = renderChapterBanner(1) + `<div>${data.story}</div>`;
-        
         if (typeof speakDM === 'function') {
             speakDM(data.story);
         }
 
-        console.log("[Step 9] Game successfully started!");
         window.currentNpcLedger = data.npc_ledger; 
-        
         autoSaveGame();
 
     } catch (error) {
@@ -207,7 +227,7 @@ async function startNewGame() {
 function updateUI() {
     if (!characterState) return;
 
-    // 1. Basic Stats (Notice we removed the char-class-desc line here!)
+    // 1. Basic Stats
     document.getElementById('char-name').innerText = `${characterState.name} (Lvl ${characterState.level})`;
     document.getElementById('char-class').innerText = characterState.class;
 
@@ -509,7 +529,8 @@ function confirmNewGame() {
         startNewGame();
     }
 }
-// 3. Return to Main Menu (Safe Local Exit)
+
+// Return to Main Menu (Safe Local Exit)
 function goToMainMenu() {
     if (confirm("Return to main menu? Make sure to save your game first.")) {
         window.speechSynthesis.cancel();
@@ -519,7 +540,6 @@ function goToMainMenu() {
 
 function exitGame() {
     if (confirm("Are you sure you want to exit? Your progress has been saved locally.")) {
-        // Redirect to a landing screen or reset view
         window.location.reload(); 
     }
 }
@@ -576,7 +596,6 @@ function importSaveFile(event) {
         }
     };
     reader.readAsText(file);
-    // Reset the input so the same file can be uploaded again if needed
     event.target.value = ""; 
 }
 
@@ -590,12 +609,17 @@ function loadStateIntoGame(data) {
     updateUI();
     updateNPCs(window.currentNpcLedger);
     document.getElementById("start-modal").style.display = "none";
+    const creationModal = document.getElementById('creation-modal');
+    if (creationModal) creationModal.style.display = 'none';
 
     autoSaveGame();
 }
 
 // --- Check for Autosave on Start / Resume ---
-function loadAutosave() {
+async function loadAutosave() {
+    const key = await ensureGeminiApiKey();
+    if (!key) return;
+
     const raw = localStorage.getItem("eternity_autosave");
     if (!raw) {
         alert("No autosaved game found.");
@@ -608,11 +632,10 @@ function loadAutosave() {
         console.error("Autosave load error:", err);
     }
 }
-
 function triggerScreenEffect(className) {
     const gameScreen = document.getElementById('main-game');
     gameScreen.classList.add(className);
     setTimeout(() => {
         gameScreen.classList.remove(className);
-    }, 800); // Remove effect after animation finishes
+    }, 800); 
 }

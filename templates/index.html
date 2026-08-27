@@ -152,6 +152,58 @@
         </div>
     </div>
 
+    <!-- API Key Modal -->
+    <div id="apikey-modal" class="modal" style="display: none;">
+        <h1 style="color: var(--accent-color); margin-bottom: 10px;">GEMINI API KEY REQUIRED</h1>
+        <p style="margin-bottom: 20px; max-width: 400px; font-size: 0.9rem; color: #9ca3af; text-align: center;">
+            This game requires your own Google Gemini API key. Get a free key at 
+            <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color);">Google AI Studio</a>.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 15px; width: 320px; max-width: 90vw;">
+            <input type="password" id="apikey-input" placeholder="Paste your API key here..." style="width: 100%; padding: 10px; background: #1f2937; border: 1px solid #4b5563; color: #fff; border-radius: 4px;">
+            <button onclick="submitApiKey()" style="padding: 12px; font-size: 1rem;">Save & Continue</button>
+        </div>
+    </div>
+
+    <!-- Character Creation Modal -->
+    <div id="creation-modal" class="modal" style="display: none;">
+        <h1 style="color: var(--accent-color); margin-bottom: 10px;">CREATE YOUR HERO</h1>
+        
+        <div style="display: flex; flex-direction: column; gap: 15px; width: 320px; max-width: 90vw;">
+            <div>
+                <label style="display: block; font-size: 0.85rem; color: #a0aec0; margin-bottom: 5px;">HERO NAME</label>
+                <input type="text" id="hero-name-input" value="Vaughn" style="width: 100%; padding: 10px; background: #1f2937; border: 1px solid #4b5563; color: #fff; border-radius: 4px;">
+            </div>
+
+            <div>
+                <label style="display: block; font-size: 0.85rem; color: #a0aec0; margin-bottom: 5px;">CHOOSE CLASS</label>
+                <select id="hero-class-select" onchange="toggleElementSelector()" style="width: 100%; padding: 10px; background: #1f2937; border: 1px solid #4b5563; color: #fff; border-radius: 4px;">
+                    <option value="Vanguard">Vanguard (Brawler / Speed)</option>
+                    <option value="Kinetic">Kinetic (Psychic)</option>
+                    <option value="Elementalist">Elementalist (Elemental Master)</option>
+                    <option value="Warden">Warden (Shapeshifter / Nature)</option>
+                </select>
+            </div>
+
+            <!-- Hidden by default unless Elementalist is chosen -->
+            <div id="element-container" style="display: none;">
+                <label style="display: block; font-size: 0.85rem; color: #a0aec0; margin-bottom: 5px;">PRIMARY ELEMENT</label>
+                <select id="hero-element-select" style="width: 100%; padding: 10px; background: #1f2937; border: 1px solid #4b5563; color: #fff; border-radius: 4px;">
+                    <option value="fire">Fire</option>
+                    <option value="air">Air</option>
+                    <option value="electricity">Electricity</option>
+                    <option value="light">Light</option>
+                    <option value="water">Water</option>
+                    <option value="plant">Plant</option>
+                    <option value="earth">Earth</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </div>
+
+            <button onclick="submitCharacterCreation()" style="padding: 12px; font-size: 1rem; margin-top: 10px;">Begin Journey</button>
+        </div>
+    </div>
+
     <script src="/static/main.js"></script>
 </body>
 </html>
