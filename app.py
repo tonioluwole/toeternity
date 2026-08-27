@@ -222,14 +222,15 @@ def start_game():
         "primary_element": primary_elem, "affinity_element": aff, "struggle_element": strg,
         "specialized_path": None,
         "inventory": ["Lesser Healing Potion", "50 Gold Pieces"],
-        "campaign_summary": "The hero awakens in the ruins, remembering nothing."
+        "campaign_summary": "The hero awakens in The Chronolith Depths, remembering nothing."
     }
 
     chapter_1_goal = PLOT_POINTS[1]
     prompt = (
         f"Hero State: {json.dumps(initial_char)}\n"
         f"CURRENT PLOT OBJECTIVE: {chapter_1_goal}\n\n"
-        "Begin the story. Describe where the hero awakens alone in the crumbling ruin."
+        # Explicitly instruct the AI to name-drop the location
+        "Begin the story. Describe where the hero awakens alone in the crumbling ruins known as The Chronolith Depths. Mention the pulsing residual magical energy of the ancient, time-worn obelisks buried in the stone."
     )
 
     client = get_gemini_client()
@@ -296,7 +297,7 @@ def generate_voice():
         return jsonify({"error": "Failed to generate voice"}), 500
 
 PLOT_POINTS = {
-    1: "The Awakening: The hero awakens in a crumbling underground ruin with severe amnesia. To escape the initial chamber, they must systematically search the rubble for a hidden toolkit, bypass a rigged pressure-plate trap on the heavy stone exit door, and pry it open. Set 'chapter_complete' to true ONLY when the trap is safely disarmed, the door is opened, and the hero steps out into the outer catacombs.",
+    1: "The Chronolith Depths: The hero awakens in a crumbling underground ruin with severe amnesia. To escape the initial chamber, they must systematically search the rubble for a hidden toolkit, bypass a rigged pressure-plate trap on the heavy stone exit door, and pry it open. Set 'chapter_complete' to true ONLY when the trap is safely disarmed, the door is opened, and the hero steps out into the outer catacombs.",
     2: "The Shadow Ambush: The hero navigates the winding, dark catacombs leading toward the surface. They are tracked and ambushed by a pack of feral Shadow-Hounds. They must manage their resources, fend off waves of beasts, and locate the hidden stairway leading up to the surface forest. Set 'chapter_complete' to true ONLY when the hound pack is defeated or evaded and the hero reaches the forest edge.",
     3: "The Glimmering Nuisance: Emerging into the forest, the hero spots a sarcastic, fast-talking female fairy named Gogo trapped inside a glass lantern held by a suspicious wandering scavenger. They must negotiate, intimidate, or fight the scavenger to free her. Set 'chapter_complete' to true ONLY when Gogo is successfully freed and officially joins the party as a companion.",
     4: "The Prism Mechanism: The hero travels to the nearest frontier town and tracks down an eccentric scholar named Crow who knows about the Aether Core. To get answers, the hero must help Crow gather three rare reagents from the town market and solve a complex multi-tiered crystal light puzzle. Set 'chapter_complete' to true ONLY when all reagents are delivered, the light puzzle is solved, and the Core unlocks.",

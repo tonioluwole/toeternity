@@ -2,7 +2,6 @@
 .env
 *-credentials.json
 google-credentials.json
-Eternity Alpha.zip
 
 # Local Save Data
 eternity_save.json
