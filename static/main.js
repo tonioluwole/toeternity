@@ -314,7 +314,7 @@ async function useItem(itemName) {
     const res = await fetch('/api/consume', {
         method: 'POST',
         headers: apiHeaders(),
-        body: JSON.stringify({ character: characterState, item: itemName })
+        body: JSON.stringify({ item: itemName })
     });
     
     if (res.ok) {
@@ -342,7 +342,8 @@ async function sendAction() {
     const res = await fetch('/api/action', {
         method: 'POST',
         headers: apiHeaders(),
-        body: JSON.stringify({ action: action, character: characterState, history: chatHistory })
+        // Send ONLY the action string. The server knows everything else.
+        body: JSON.stringify({ action: action })
     });
 
     // Capture existing chapter before updating characterState

@@ -3,6 +3,8 @@ import sys
 import os
 from dotenv import load_dotenv 
 from flask import Flask, jsonify, render_template, request, Response
+from flask import session
+from flask_session import Session
 from google import genai
 from google.genai import types
 from models import DMResponse
@@ -25,6 +27,14 @@ app = Flask(
     template_folder=os.path.join(ROOT_DIR, "templates"),
     static_folder=os.path.join(ROOT_DIR, "static"),
 )
+
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 2592000  # 30 days in seconds
+
+# Configure Server-Side Sessions
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'eternity-secret-key')
+app.config['SESSION_TYPE'] = 'filesystem'
+Session(app)
+
 
 def get_request_api_key():
     header_key = request.headers.get("X-Gemini-Api-Key", "").strip()
@@ -242,6 +252,11 @@ def start_game():
         char_dict["affinity_element"] = aff
         char_dict["struggle_element"] = strg
 
+    # Store state securely in the server session instead of relying on the client
+    session['character'] = char_dict
+    session['history'] = []
+    session['npc_ledger'] = {}
+
     return jsonify({
         "character": char_dict, 
         "story": dm_data.narrative,
@@ -293,33 +308,37 @@ PLOT_POINTS = {
 @app.route("/api/action", methods=["POST"])
 def process_action():
     data = request.json
+    action = data.get("action", "")
     
-    history = data.get("history", [])
+    # --- State Payload Offloading: Read from Session ---
+    character = session.get('character', {})
+    chat_history = session.get('history', [])
+    npc_ledger = session.get('npc_ledger', {})
+    
     history_text = "No recent events."
-    if history:
-        history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history])
+    if chat_history:
+        history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
     
-    npc_ledger = data.get("npc_ledger", {})
     known_npcs = json.dumps(npc_ledger)
     
-    # --- NEW: Plot Tracking ---
-    current_chapter = data['character'].get('current_chapter', 1)
+    # --- Plot Tracking ---
+    current_chapter = character.get('current_chapter', 1)
     chapter_goal = PLOT_POINTS.get(current_chapter, "Survive and explore the world. (Free Roam)")
     
     # Inject routing rules if the NPC is in the current known ledger
     active_routing = ""
     for npc_name in NPC_ROUTING_RULES:
-        if npc_name in npc_ledger or npc_name in data['action']:
+        if npc_name in npc_ledger or npc_name in action:
             active_routing += f"\nROUTING RULES FOR {npc_name}: {NPC_ROUTING_RULES[npc_name]}"
     
     prompt = (
-        f"Hero State: {json.dumps(data['character'])}\n"
-        f"The Story So Far (Long-Term Memory):\n{data['character'].get('campaign_summary', '')}\n\n"
+        f"Hero State: {json.dumps(character)}\n"
+        f"The Story So Far (Long-Term Memory):\n{character.get('campaign_summary', '')}\n\n"
         f"Recent Events (Short-Term Memory):\n{history_text}\n"
         f"Known NPCs:\n{known_npcs}\n"
         f"{active_routing}\n\n"
         f"CURRENT PLOT OBJECTIVE: {chapter_goal}\n\n"
-        f"Action: '{data['action']}'\n"
+        f"Action: '{action}'\n"
         "Evaluate action, roll d20, apply rules, update state."
     )
     
@@ -346,15 +365,15 @@ def process_action():
                 "notes": npc.notes
             }
 
-    # --- NEW: Advance the Chapter ---
+    # --- Advance the Chapter ---
     if getattr(dm_data, 'chapter_complete', False):
         char_dict['current_chapter'] = current_chapter + 1
     else:
         char_dict['current_chapter'] = current_chapter
 
     path_choices = None
-    if char_dict["level"] >= 5 and not char_dict.get("specialized_path"):
-        class_name = char_dict["class"]
+    if char_dict.get("level", 1) >= 5 and not char_dict.get("specialized_path"):
+        class_name = char_dict.get("class", "")
         all_paths = CLASS_PATHS.get(class_name, {})
         
         if class_name == "Elementalist":
@@ -376,9 +395,20 @@ def process_action():
         else:
             path_choices = all_paths
 
-    is_dead = char_dict["status"].lower() == "dead" or char_dict["hp"] <= 0
+    is_dead = char_dict.get("status", "").lower() == "dead" or char_dict.get("hp", 0) <= 0
     if is_dead:
         char_dict["hp"], char_dict["status"] = 0, "Dead"
+
+    # --- Context Token Compression (Garbage Collection) ---
+    chat_history.append({"role": "Hero", "content": action})
+    chat_history.append({"role": "Game Master", "content": dm_data.narrative.replace('*', '')})
+    if len(chat_history) > 6:
+        chat_history = chat_history[-6:]
+        
+    # --- Save State Back to Server Session ---
+    session['character'] = char_dict
+    session['history'] = chat_history
+    session['npc_ledger'] = npc_ledger
 
     return jsonify({
         "character": char_dict, 
@@ -423,13 +453,16 @@ def choose_path():
 @app.route("/api/consume", methods=["POST"])
 def consume_item():
     data = request.json
-    char = data.get("character")
     item = data.get("item")
+    char = session.get('character', {})
     
-    if item in char["inventory"]:
+    if item in char.get("inventory", []):
         char["inventory"].remove(item)
         heal_amount = 15
         char["hp"] = min(char["max_hp"], char["hp"] + heal_amount)
+        
+        # Save back to session
+        session['character'] = char
         
         narrative = f"\n\n*** You quickly consume the {item}, restoring {heal_amount} HP. ***\n"
         return jsonify({"character": char, "narrative": narrative})
