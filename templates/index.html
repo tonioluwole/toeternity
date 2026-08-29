@@ -103,12 +103,17 @@
         <div class="divider"></div>
 
         <div style="display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px;">
-            <!-- Row 1: Save & Load -->
+            <!-- Row 1: Quick Save & Quick Load -->
+            <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                <button onclick="quickSave(1)" style="flex: 1; padding: 8px; font-size: 13px; background: #374151;">Quick Save</button>
+                <button onclick="quickLoad(1)" style="flex: 1; padding: 8px; font-size: 13px; background: #1f2937;">Quick Load</button>
+            </div>
+            <!-- Row 2: Save & Load -->
             <div style="display: flex; gap: 10px;">
                 <button id="save-button" onclick="exportSaveFile()" style="flex: 1; padding: 10px; font-size: 14px;">Save Game file to PC</button>
                 <button id="load-button" onclick="document.getElementById('file-upload').click()" style="flex: 1; padding: 10px; font-size: 14px; background: #4b5563;">Load Save file from PC</button>
             </div>
-            <!-- Row 2: New Game & Main Menu -->
+            <!-- Row 3: New Game & Main Menu -->
             <div style="display: flex; gap: 10px;">
                 <button onclick="confirmNewGame()" style="flex: 1; padding: 10px; font-size: 14px; background: #991b1b;">New Game</button>
                 <button onclick="goToMainMenu()" style="flex: 1; padding: 10px; font-size: 14px; background: #374151;">Main Menu</button>
@@ -122,7 +127,8 @@
 
     <div id="main-game">
         <div id="story-log" aria-hidden="true">Connecting to Eternity DM...</div>
-        <div id="input-panel">
+        <div id="input-panel" style="position: relative;">
+            <div id="autocomplete-popup" style="display: none; position: absolute; bottom: 100%; left: 0; background: #374151; border: 1px solid #4b5563; border-radius: 4px; padding: 5px; width: 100%; max-height: 150px; overflow-y: auto; z-index: 10; margin-bottom: 5px;"></div>
             <input type="text" id="action-input" placeholder="Type your action..." onkeydown="if(event.key === 'Enter') sendAction()">
             <button id="action-button" onclick="sendAction()">Act</button>
         </div>

@@ -28,7 +28,7 @@ const classDescriptions = {
     "Elementalist": "A master of natural forces who attacks and defends using blasts of fire, water, earth, and more.",
     "Warden": "A fierce shape-shifter who can command explosive plant growth and transform into deadly wild animals."
 };
-
+let isUserScrolling = false;
 // --- Initialization & Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
     const volSlider = document.getElementById('tts-vol');
@@ -42,6 +42,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ttsSpeed = parseFloat(e.target.value);
         if (currentDMAudio) currentDMAudio.playbackRate = ttsSpeed;
     });
+
+    const storyLog = document.getElementById('story-log');
+    if (storyLog) {
+        storyLog.addEventListener('scroll', function() {
+            // A 20px buffer prevents false positives when the typewriter is active
+            isUserScrolling = (this.scrollTop + this.clientHeight) < (this.scrollHeight - 20);
+        });
+    }
 });
 
 // --- Quality of Life Modifiers ---
@@ -365,6 +373,77 @@ async function useItem(itemName) {
     }
 }
 
+function quickSave(slot) {
+    if (!characterState) return alert("No active game to save.");
+    const saveData = {
+        character: characterState,
+        history: chatHistory,
+        npc_ledger: window.currentNpcLedger || {},
+        story_log_html: document.getElementById("story-log").innerHTML,
+        saved_at: new Date().toISOString()
+    };
+    localStorage.setItem(`eternity_quicksave_${slot}`, JSON.stringify(saveData));
+    alert(`Progress saved to Quick Slot ${slot}.`);
+}
+
+function quickLoad(slot) {
+    const raw = localStorage.getItem(`eternity_quicksave_${slot}`);
+    if (!raw) return alert("Quick Slot is empty.");
+    loadStateIntoGame(JSON.parse(raw));
+    alert("Quick Save loaded.");
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const actionInput = document.getElementById('action-input');
+    const autoPopup = document.getElementById('autocomplete-popup');
+
+    if (actionInput && autoPopup) {
+        actionInput.addEventListener('input', (e) => {
+            if (!characterState) return;
+            const val = e.target.value.toLowerCase();
+            let suggestions = [];
+            
+            if (val.startsWith("cast ") || val.startsWith("use ")) {
+                const term = val.split(" ").slice(1).join(" ");
+                
+                if (characterState.abilities) {
+                    suggestions.push(...characterState.abilities.map(a => typeof a === 'string' ? a : a.name));
+                }
+                if (characterState.inventory && characterState.inventory.consumables) {
+                    suggestions.push(...characterState.inventory.consumables);
+                }
+                
+                if (term) {
+                    suggestions = suggestions.filter(s => s.toLowerCase().includes(term));
+                }
+            }
+
+            if (suggestions.length > 0) {
+                autoPopup.innerHTML = suggestions.map(s => 
+                    `<div class="auto-item" onclick="selectAutocomplete('${val.split(" ")[0]} ${s}')" style="padding: 5px; cursor: pointer; border-bottom: 1px solid #4b5563; color: #fff;">${s}</div>`
+                ).join('');
+                autoPopup.style.display = 'block';
+            } else {
+                autoPopup.style.display = 'none';
+            }
+        });
+
+        // Hide popup when clicking elsewhere
+        document.addEventListener('click', (e) => {
+            if (e.target.id !== 'action-input') autoPopup.style.display = 'none';
+        });
+    }
+});
+
+// Expose selection function to the global window
+window.selectAutocomplete = function(fullText) {
+    const actionInput = document.getElementById('action-input');
+    const autoPopup = document.getElementById('autocomplete-popup');
+    actionInput.value = fullText;
+    autoPopup.style.display = 'none';
+    actionInput.focus();
+};
+
 async function sendAction() {
     const input = document.getElementById('action-input');
     const action = input.value.trim();
@@ -400,22 +479,42 @@ async function sendAction() {
     }
 
     if (data.d20_roll) {
-        let rollClass = "roll-success";
-        let rollText = "Success";
+        const rollId = 'roll-' + Date.now();
+        log.innerHTML += `\n<div id="${rollId}" class="roll-badge badge-neutral">🎲 Roll: <span class="roll-number">?</span></div>\n\n`;
         
-        if (data.d20_roll === 1) {
-            rollClass = "roll-crit-fail";
-            rollText = "Critical Failure!";
-            triggerScreenEffect('crit-fail-anim');
-        } else if (data.d20_roll === 20) {
-            rollClass = "roll-crit-success";
-            rollText = "Critical Success!";
-            triggerScreenEffect('crit-success-anim');
-        } else if (data.d20_roll <= 10) {
-            rollClass = "roll-fail";
-            rollText = "Failure";
-        }
-        log.innerHTML += `\n<div class="roll-badge ${rollClass}">🎲 Roll: ${data.d20_roll} (${rollText})</div>\n\n`;
+        const rollElement = document.getElementById(rollId);
+        const numSpan = rollElement.querySelector('.roll-number');
+        let cycleCount = 0;
+        
+        // Cycle numbers rapidly for 1 second (20 iterations at 50ms)
+        const rollInterval = setInterval(() => {
+            numSpan.innerText = Math.floor(Math.random() * 20) + 1;
+            cycleCount++;
+            
+            if (cycleCount >= 20) {
+                clearInterval(rollInterval);
+                let rollClass = "roll-success";
+                let rollText = "Success";
+                
+                if (data.d20_roll === 1) {
+                    rollClass = "roll-crit-fail";
+                    rollText = "Critical Failure!";
+                    triggerScreenEffect('crit-fail-anim');
+                } else if (data.d20_roll === 20) {
+                    rollClass = "roll-crit-success";
+                    rollText = "Critical Success!";
+                    triggerScreenEffect('crit-success-anim');
+                } else if (data.d20_roll <= 10) {
+                    rollClass = "roll-fail";
+                    rollText = "Failure";
+                }
+                
+                rollElement.className = `roll-badge ${rollClass}`;
+                rollElement.innerHTML = `🎲 Roll: ${data.d20_roll} (${rollText})`;
+                
+                if (!isUserScrolling) log.scrollTop = log.scrollHeight;
+            }
+        }, 50);
     }
 
     chatHistory.push({ role: "Hero", content: action });
@@ -441,11 +540,18 @@ async function sendAction() {
     actionInput.disabled = true;
     actionButton.disabled = true;
 
+    
+
     function typeWriter() {
         if (i < textToType.length) {
             textContainer.innerHTML += textToType.charAt(i);
             i++;
-            log.scrollTop = log.scrollHeight; 
+            
+            // Replace the old line with this conditional block
+            if (!isUserScrolling) {
+                log.scrollTop = log.scrollHeight; 
+            }
+            
             setTimeout(typeWriter, 5); 
         } else {
             actionInput.disabled = false;
