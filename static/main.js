@@ -30,7 +30,9 @@ const classDescriptions = {
 };
 let isUserScrolling = false;
 // --- Initialization & Event Listeners ---
+// --- Initialization & Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. Volume & Speed Sliders
     const volSlider = document.getElementById('tts-vol');
     if (volSlider) volSlider.addEventListener('input', (e) => {
         ttsVolume = parseFloat(e.target.value);
@@ -43,13 +45,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentDMAudio) currentDMAudio.playbackRate = ttsSpeed;
     });
 
+    // 2. Scroll Pause Tracker
     const storyLog = document.getElementById('story-log');
     if (storyLog) {
         storyLog.addEventListener('scroll', function() {
-            // A 20px buffer prevents false positives when the typewriter is active
             isUserScrolling = (this.scrollTop + this.clientHeight) < (this.scrollHeight - 20);
         });
     }
+
 });
 
 // --- Quality of Life Modifiers ---
@@ -392,57 +395,6 @@ function quickLoad(slot) {
     loadStateIntoGame(JSON.parse(raw));
     alert("Quick Save loaded.");
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    const actionInput = document.getElementById('action-input');
-    const autoPopup = document.getElementById('autocomplete-popup');
-
-    if (actionInput && autoPopup) {
-        actionInput.addEventListener('input', (e) => {
-            if (!characterState) return;
-            const val = e.target.value.toLowerCase();
-            let suggestions = [];
-            
-            if (val.startsWith("cast ") || val.startsWith("use ")) {
-                const term = val.split(" ").slice(1).join(" ");
-                
-                if (characterState.abilities) {
-                    suggestions.push(...characterState.abilities.map(a => typeof a === 'string' ? a : a.name));
-                }
-                if (characterState.inventory && characterState.inventory.consumables) {
-                    suggestions.push(...characterState.inventory.consumables);
-                }
-                
-                if (term) {
-                    suggestions = suggestions.filter(s => s.toLowerCase().includes(term));
-                }
-            }
-
-            if (suggestions.length > 0) {
-                autoPopup.innerHTML = suggestions.map(s => 
-                    `<div class="auto-item" onclick="selectAutocomplete('${val.split(" ")[0]} ${s}')" style="padding: 5px; cursor: pointer; border-bottom: 1px solid #4b5563; color: #fff;">${s}</div>`
-                ).join('');
-                autoPopup.style.display = 'block';
-            } else {
-                autoPopup.style.display = 'none';
-            }
-        });
-
-        // Hide popup when clicking elsewhere
-        document.addEventListener('click', (e) => {
-            if (e.target.id !== 'action-input') autoPopup.style.display = 'none';
-        });
-    }
-});
-
-// Expose selection function to the global window
-window.selectAutocomplete = function(fullText) {
-    const actionInput = document.getElementById('action-input');
-    const autoPopup = document.getElementById('autocomplete-popup');
-    actionInput.value = fullText;
-    autoPopup.style.display = 'none';
-    actionInput.focus();
-};
 
 async function sendAction() {
     const input = document.getElementById('action-input');

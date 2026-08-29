@@ -128,8 +128,12 @@
     <div id="main-game">
         <div id="story-log" aria-hidden="true">Connecting to Eternity DM...</div>
         <div id="input-panel" style="position: relative;">
-            <div id="autocomplete-popup" style="display: none; position: absolute; bottom: 100%; left: 0; background: #374151; border: 1px solid #4b5563; border-radius: 4px; padding: 5px; width: 100%; max-height: 150px; overflow-y: auto; z-index: 10; margin-bottom: 5px;"></div>
-            <input type="text" id="action-input" placeholder="Type your action..." onkeydown="if(event.key === 'Enter') sendAction()">
+            
+            <!--auto complete div that doesnt work rn-->
+            <div id="autocomplete-popup" style="display: none; position: absolute; bottom: 100%; left: 0; right: 0; background: #1f2937; border: 1px solid #4b5563; border-radius: 4px; padding: 5px; max-height: 150px; overflow-y: auto; z-index: 9999; margin-bottom: 5px; box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.3);"></div>
+            <!--auto complete div that doesnt work rn-->
+
+            <input type="text" id="action-input" placeholder="Type what you want to do..." onkeydown="if(event.key === 'Enter') sendAction()">
             <button id="action-button" onclick="sendAction()">Act</button>
         </div>
     </div>
