@@ -3,6 +3,7 @@
     --panel-bg: rgba(0, 28, 83, 0.85);
     --text-color: #ffffff;
     --accent-color: #08e7f7;
+    --story-size: 1rem;
     --wash-top-left: rgba(59, 130, 246, 0.1);
     --wash-side-right: transparent;
     --accent-color2: white;
@@ -20,6 +21,15 @@
     "GRAD" 0;
 }
 
+.story-text { 
+    font-size: var(--story-size); 
+    transition: font-size 0.2s;
+}
+
+@keyframes flashGreen { 0% { color: #55ff55; font-weight: bold; } 100% { color: inherit; } }
+@keyframes flashRed { 0% { color: #ff5555; font-weight: bold; } 100% { color: inherit; } }
+.trend-up { animation: flashGreen 1.5s ease-out; }
+.trend-down { animation: flashRed 1.5s ease-out; }
 
 body {
     background-color: var(--bg-color); color: var(--text-color);

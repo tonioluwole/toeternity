@@ -1,6 +1,11 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
+class InventoryCategories(BaseModel):
+    consumables: list[str]
+    equipment: list[str]
+    quest_items: list[str]
+
 class HeroAbility(BaseModel):
     name: str
     description: str = Field(description="A short, flavorful description of what this ability does.")
@@ -17,7 +22,7 @@ class HeroPowerState(BaseModel):
     hp: int
     max_hp: int
     abilities: List[HeroAbility]
-    inventory: List[str] = Field(default=[])
+    inventory: InventoryCategories # Updated from List[str]
     status: str = Field(default='Alive')
 
 class NPCRelationship(BaseModel):

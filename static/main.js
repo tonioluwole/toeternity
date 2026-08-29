@@ -1,6 +1,16 @@
-// Global toggle for voice (you can wire this to a button later if you want a mute option)
+// Global State & Settings
 let voiceEnabled = true;
-let currentDMAudio = null
+let currentDMAudio = null;
+let ttsVolume = 1.0;
+let ttsSpeed = 1.0;
+let currentSize = 1.0;
+let previousHP = 20;
+
+let characterState = null;
+let chatHistory = [];
+const GEMINI_KEY_STORAGE = "eternity_gemini_api_key";
+const GEMINI_KEY_URL = "https://ai.google.dev/gemini-api/docs/api-key";
+let apiKeyResolver = null;
 
 const CHAPTER_TITLES = {
     1: "The Awakening",
@@ -12,6 +22,34 @@ const CHAPTER_TITLES = {
     7: "The Legacy"
 };
 
+const classDescriptions = {
+    "Kinetic": "A psychic hero who uses the power of their mind to throw objects, build forcefields, and control enemies.",
+    "Vanguard": "A superhuman brawler who relies on extreme physical speed, giant size, and unbreakable toughness.",
+    "Elementalist": "A master of natural forces who attacks and defends using blasts of fire, water, earth, and more.",
+    "Warden": "A fierce shape-shifter who can command explosive plant growth and transform into deadly wild animals."
+};
+
+// --- Initialization & Event Listeners ---
+document.addEventListener('DOMContentLoaded', () => {
+    const volSlider = document.getElementById('tts-vol');
+    if (volSlider) volSlider.addEventListener('input', (e) => {
+        ttsVolume = parseFloat(e.target.value);
+        if (currentDMAudio && voiceEnabled) currentDMAudio.volume = ttsVolume;
+    });
+
+    const speedSlider = document.getElementById('tts-speed');
+    if (speedSlider) speedSlider.addEventListener('input', (e) => {
+        ttsSpeed = parseFloat(e.target.value);
+        if (currentDMAudio) currentDMAudio.playbackRate = ttsSpeed;
+    });
+});
+
+// --- Quality of Life Modifiers ---
+function scaleText(direction) {
+    currentSize += (direction === 'up') ? 0.1 : -0.1;
+    document.documentElement.style.setProperty('--story-size', `${currentSize}rem`);
+}
+
 function renderChapterBanner(chapterNum) {
     const title = CHAPTER_TITLES[chapterNum] || "A New Journey";
     return `
@@ -22,10 +60,10 @@ function renderChapterBanner(chapterNum) {
     `;
 }
 
+// --- Audio & TTS ---
 async function speakDM(text) {
     if (!text) return;
     
-    // Stop browser TTS and active audio immediately
     window.speechSynthesis.cancel();
     if (currentDMAudio) {
         currentDMAudio.pause();
@@ -46,8 +84,8 @@ async function speakDM(text) {
             const audioUrl = URL.createObjectURL(blob);
             currentDMAudio = new Audio(audioUrl);
             
-            // Set volume based on current mute state
-            currentDMAudio.volume = voiceEnabled ? 1.0 : 0.0;
+            currentDMAudio.volume = voiceEnabled ? ttsVolume : 0.0;
+            currentDMAudio.playbackRate = ttsSpeed;
             currentDMAudio.play();
             serverAudioSucceeded = true;
         }
@@ -55,9 +93,10 @@ async function speakDM(text) {
         console.warn("Server voice generation failed, falling back to browser TTS:", error);
     }
 
-    // Browser fallback only plays if voiceEnabled is true
     if (!serverAudioSucceeded && voiceEnabled) {
         const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = ttsSpeed;
+        utterance.volume = ttsVolume;
         window.speechSynthesis.speak(utterance);
     }
 }
@@ -68,32 +107,19 @@ function toggleMute() {
     
     if (voiceEnabled) {
         muteBtn.innerText = '🔊 Mute';
-        // Restore volume if audio is currently playing
-        if (currentDMAudio) {
-            currentDMAudio.volume = 1.0;
-        }
+        if (currentDMAudio) currentDMAudio.volume = ttsVolume;
     } else {
         muteBtn.innerText = '🔇 Unmute';
-        // Drop volume to 0 instantly without pausing or destroying the track
-        if (currentDMAudio) {
-            currentDMAudio.volume = 0.0;
-        }
+        if (currentDMAudio) currentDMAudio.volume = 0.0;
         window.speechSynthesis.cancel();
     }
 }
 
-// Fix for some browsers needing a moment to load voices
 window.speechSynthesis.onvoiceschanged = () => {
     window.speechSynthesis.getVoices();
 };
-let characterState = null;
-let chatHistory = [];
-const GEMINI_KEY_STORAGE = "eternity_gemini_api_key";
-const GEMINI_KEY_URL = "https://ai.google.dev/gemini-api/docs/api-key";
 
-// Global resolver for the API key promise
-let apiKeyResolver = null;
-
+// --- Authentication & Setup ---
 function ensureGeminiApiKey() {
     return new Promise((resolve) => {
         let key = sessionStorage.getItem(GEMINI_KEY_STORAGE);
@@ -101,8 +127,6 @@ function ensureGeminiApiKey() {
             resolve(key);
             return;
         }
-
-        // Store the resolver and show the custom modal
         apiKeyResolver = resolve;
         document.getElementById('apikey-modal').style.display = 'flex';
     });
@@ -118,7 +142,7 @@ function submitApiKey() {
     }
 
     sessionStorage.setItem(GEMINI_KEY_STORAGE, key);
-    input.value = ""; // Clear password field
+    input.value = ""; 
     document.getElementById('apikey-modal').style.display = 'none';
 
     if (apiKeyResolver) {
@@ -133,14 +157,7 @@ function apiHeaders(extra) {
     if (key) headers["X-Gemini-Api-Key"] = key;
     return headers;
 }
-const classDescriptions = {
-    "Kinetic": "A psychic hero who uses the power of their mind to throw objects, build forcefields, and control enemies.",
-    "Vanguard": "A superhuman brawler who relies on extreme physical speed, giant size, and unbreakable toughness.",
-    "Elementalist": "A master of natural forces who attacks and defends using blasts of fire, water, earth, and more.",
-    "Warden": "A fierce shape-shifter who can command explosive plant growth and transform into deadly wild animals."
-};
 
-// Toggle element dropdown if Elementalist is chosen in modal
 function toggleElementSelector() {
     const classVal = document.getElementById('hero-class-select').value;
     const elemContainer = document.getElementById('element-container');
@@ -149,9 +166,8 @@ function toggleElementSelector() {
     }
 }
 
-// Triggered when clicking "New Game" from the main menu
+// --- Game Logic ---
 async function startNewGame() {
-    console.log("[Step 1] startNewGame triggered");
     const key = await ensureGeminiApiKey();
     if (!key) return;
 
@@ -164,7 +180,6 @@ async function startNewGame() {
     }
 }
 
-// Triggered when clicking "Begin Journey" inside the creation modal
 async function submitCharacterCreation() {
     const nameInput = document.getElementById('hero-name-input');
     const classSelect = document.getElementById('hero-class-select');
@@ -193,13 +208,12 @@ async function submitCharacterCreation() {
             body: JSON.stringify({ name: name, class: charClass, element: element })
         });
         
-        if (!res.ok) {
-            throw new Error(`Server Error: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`Server Error: ${res.status}`);
 
         const data = await res.json();
         
         characterState = data.character;
+        previousHP = characterState.hp; // Establish baseline
         updateUI();
         
         if (typeof updateNPCs === 'function') {
@@ -231,8 +245,16 @@ function updateUI() {
     document.getElementById('char-name').innerText = `${characterState.name} (Lvl ${characterState.level})`;
     document.getElementById('char-class').innerText = characterState.class;
 
-    // 2. Health Bar
-    document.getElementById('char-hp-text').innerText = `${characterState.hp} / ${characterState.max_hp}`;
+    // 2. Health Bar & Trend Indicator
+    const hpText = document.getElementById('char-hp-text');
+    hpText.classList.remove("trend-up", "trend-down");
+    void hpText.offsetWidth; // Force CSS reflow to restart animation
+
+    if (characterState.hp > previousHP) hpText.classList.add("trend-up");
+    if (characterState.hp < previousHP) hpText.classList.add("trend-down");
+    previousHP = characterState.hp;
+
+    hpText.innerText = `${characterState.hp} / ${characterState.max_hp}`;
     const hpPercent = Math.max(0, (characterState.hp / characterState.max_hp) * 100);
     const hpFill = document.getElementById('health-bar-fill');
     if (hpFill) hpFill.style.width = hpPercent + '%';
@@ -283,24 +305,38 @@ function updateUI() {
         }
     }
 
-    // 5. Inventory
+    // 5. Smart Categorized Inventory
     const invList = document.getElementById('inventory-list');
     if (invList) {
         invList.innerHTML = '';
-        if (characterState.inventory && characterState.inventory.length > 0) {
-            characterState.inventory.forEach(item => {
+        const inv = characterState.inventory;
+        
+        const renderCategory = (title, items) => {
+            if (!items || items.length === 0) return;
+            
+            let categoryHeader = document.createElement('div');
+            categoryHeader.className = 'inv-category-header';
+            categoryHeader.innerHTML = `<strong style="color: #fff; border-bottom: 1px solid #444; display: block; margin-top: 10px; padding-bottom: 3px;">${title}</strong>`;
+            invList.appendChild(categoryHeader);
+
+            items.forEach(item => {
                 let li = document.createElement('li');
                 li.className = 'inventory-item';
                 
-                // Tag items that can be eaten/drank
                 const isConsumable = item.toLowerCase().match(/(potion|pizza|shawarma|apple)/);
-                if (isConsumable) {
+                if (isConsumable && title === "Consumables") {
                     li.innerHTML = `${item} <button onclick="useItem('${item}')" style="padding: 2px 6px; font-size: 0.7em; margin-left: 10px;">Use</button>`;
                 } else {
                     li.innerText = item;
                 }
                 invList.appendChild(li);
             });
+        };
+
+        if (inv && (inv.consumables?.length > 0 || inv.equipment?.length > 0 || inv.quest_items?.length > 0)) {
+            renderCategory("Consumables", inv.consumables);
+            renderCategory("Equipment", inv.equipment);
+            renderCategory("Quest Items", inv.quest_items);
         } else {
             let li = document.createElement('li');
             li.className = 'inventory-item empty';
@@ -342,26 +378,20 @@ async function sendAction() {
     const res = await fetch('/api/action', {
         method: 'POST',
         headers: apiHeaders(),
-        // Send ONLY the action string. The server knows everything else.
         body: JSON.stringify({ action: action })
     });
 
-    // Capture existing chapter before updating characterState
     const previousChapter = characterState ? characterState.current_chapter : 1;
-
     const data = await res.json();
     
-    // 1. Update core states
     characterState = data.character;
     window.currentNpcLedger = data.npc_ledger;
     const currentChapter = characterState.current_chapter || 1;
 
-    // Check if the chapter advanced
     if (currentChapter > previousChapter) {
         log.innerHTML += `\n${renderChapterBanner(currentChapter)}\n`;
     }
 
-    // 2. Update the UI
     updateUI();
     updateNPCs(data.npc_ledger);
 
@@ -369,7 +399,6 @@ async function sendAction() {
         setAtmosphere(data.atmosphere);
     }
 
-    // 3. Append the instant Roll Badge
     if (data.d20_roll) {
         let rollClass = "roll-success";
         let rollText = "Success";
@@ -389,22 +418,18 @@ async function sendAction() {
         log.innerHTML += `\n<div class="roll-badge ${rollClass}">🎲 Roll: ${data.d20_roll} (${rollText})</div>\n\n`;
     }
 
-    // 4. Update the short-term memory buffer (Garbage Collection)
     chatHistory.push({ role: "Hero", content: action });
     chatHistory.push({ role: "Game Master", content: data.narrative.replace(/\*/g, '') });
     if (chatHistory.length > 6) {
         chatHistory = chatHistory.slice(chatHistory.length - 6);
     }
 
-    // 5. Fire Audio Asynchronously 
-    // Pushing this to the back of the event loop ensures it never blocks the DOM
     setTimeout(() => {
         if (typeof speakDM === 'function') {
             speakDM(data.narrative.replace(/\*/g, ''));
         }
     }, 0);
 
-    // 6. Fast Typewriter Effect & End-of-Turn Checks
     const textContainer = document.createElement('span');
     log.appendChild(textContainer);
     
@@ -413,7 +438,6 @@ async function sendAction() {
     const actionInput = document.getElementById('action-input');
     const actionButton = document.getElementById('action-button');
     
-    // Disable input while typing to prevent overlap
     actionInput.disabled = true;
     actionButton.disabled = true;
 
@@ -421,22 +445,19 @@ async function sendAction() {
         if (i < textToType.length) {
             textContainer.innerHTML += textToType.charAt(i);
             i++;
-            log.scrollTop = log.scrollHeight; // Auto-scroll with text
-            setTimeout(typeWriter, 5); // 5ms delay = incredibly fast typing
+            log.scrollTop = log.scrollHeight; 
+            setTimeout(typeWriter, 5); 
         } else {
-            // Re-enable inputs once finished
             actionInput.disabled = false;
             actionButton.disabled = false;
             actionInput.focus();
 
-            // Check for game-altering events
             if (data.is_dead) {
                 document.getElementById('death-modal').style.display = 'flex';
             } else if (data.path_choices) {
                 showPathModal(data.path_choices);
             }
             
-            // SAVE EVERYTHING AFTER TYPING COMPLETES
             autoSaveGame();
         }
     }
@@ -448,10 +469,8 @@ function showJournal() {
     const journalContent = document.getElementById('journal-content');
     
     if (characterState && characterState.campaign_summary) {
-        // Render the AI's long-term memory
         journalContent.innerText = characterState.campaign_summary;
     } else {
-        // Fallback for new games
         journalContent.innerText = "The pages are blank. Your legend has just begun.";
     }
     
@@ -508,29 +527,28 @@ function setAtmosphere(mood) {
     if (mood === 'mystical') {
         root.style.setProperty('--panel-bg', 'rgba(45, 27, 78, 0.85)');
         root.style.setProperty('--accent-color', '#ffd700'); 
-        root.style.setProperty('--wash-top-left', 'rgba(128, 0, 128, 0.25)'); // Purple
-        root.style.setProperty('--wash-side-right', 'rgba(255, 215, 0, 0.15)'); // Gold
+        root.style.setProperty('--wash-top-left', 'rgba(128, 0, 128, 0.25)');
+        root.style.setProperty('--wash-side-right', 'rgba(255, 215, 0, 0.15)');
         
     } else if (mood === 'icy') {
         root.style.setProperty('--panel-bg', 'rgba(30, 41, 59, 0.85)');
         root.style.setProperty('--accent-color', '#00ffff'); 
-        root.style.setProperty('--wash-top-left', 'rgba(0, 0, 255, 0.2)'); // Blue
-        root.style.setProperty('--wash-side-right', 'rgba(0, 255, 255, 0.2)'); // Cyan
+        root.style.setProperty('--wash-top-left', 'rgba(0, 0, 255, 0.2)'); 
+        root.style.setProperty('--wash-side-right', 'rgba(0, 255, 255, 0.2)'); 
         
     } else if (mood === 'combat') {
         root.style.setProperty('--panel-bg', 'rgba(63, 15, 15, 0.85)');
         root.style.setProperty('--accent-color', '#ff4444'); 
-        root.style.setProperty('--wash-top-left', 'rgba(255, 0, 0, 0.25)'); // Harsh Red
-        root.style.setProperty('--wash-side-right', 'rgba(244, 253, 255, 0.12)'); // Cool White
+        root.style.setProperty('--wash-top-left', 'rgba(255, 0, 0, 0.25)'); 
+        root.style.setProperty('--wash-side-right', 'rgba(244, 253, 255, 0.12)'); 
         
     } else if (mood === 'forest') {
         root.style.setProperty('--panel-bg', 'rgba(15, 51, 34, 0.85)');
         root.style.setProperty('--accent-color', '#4ade80'); 
-        root.style.setProperty('--wash-top-left', 'rgba(255, 105, 180, 0.2)'); // Pink
-        root.style.setProperty('--wash-side-right', 'rgba(255, 165, 0, 0.15)'); // Orange
+        root.style.setProperty('--wash-top-left', 'rgba(255, 105, 180, 0.2)'); 
+        root.style.setProperty('--wash-side-right', 'rgba(255, 165, 0, 0.15)'); 
         
     } else {
-        // Default Neutral Wash
         root.style.setProperty('--panel-bg', 'rgba(31, 41, 55, 0.95)');
         root.style.setProperty('--accent-color', '#3b82f6');
         root.style.setProperty('--wash-top-left', 'rgba(59, 130, 246, 0.1)');
@@ -554,7 +572,6 @@ function updateNPCs(ledger) {
         const card = document.createElement('div');
         card.className = 'npc-card';
 
-        // Choose badge color based on key phrases in disposition
         let dispClass = 'badge-neutral';
         const dispLower = (info.disposition || '').toLowerCase();
         
@@ -583,7 +600,6 @@ function confirmNewGame() {
     }
 }
 
-// Return to Main Menu (Safe Local Exit)
 function goToMainMenu() {
     if (confirm("Return to main menu? Make sure to save your game first.")) {
         window.speechSynthesis.cancel();
@@ -597,7 +613,7 @@ function exitGame() {
     }
 }
 
-// --- Silent Background Autosave ---
+// --- Save & Load Handlers ---
 function autoSaveGame() {
     if (!characterState) return;
     const autoSaveData = {
@@ -610,7 +626,6 @@ function autoSaveGame() {
     localStorage.setItem("eternity_autosave", JSON.stringify(autoSaveData));
 }
 
-// --- Manual Save to PC (File Download) ---
 function exportSaveFile() {
     if (!characterState) {
         alert("No active game to export!");
@@ -633,7 +648,6 @@ function exportSaveFile() {
     URL.revokeObjectURL(url);
 }
 
-// --- Import Save from PC ---
 function importSaveFile(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -652,9 +666,9 @@ function importSaveFile(event) {
     event.target.value = ""; 
 }
 
-// --- Shared State Loader ---
 function loadStateIntoGame(data) {
     characterState = data.character;
+    previousHP = characterState.hp; // Reset baseline upon loading
     chatHistory = data.history || [];
     window.currentNpcLedger = data.npc_ledger || {};
 
@@ -668,7 +682,6 @@ function loadStateIntoGame(data) {
     autoSaveGame();
 }
 
-// --- Check for Autosave on Start / Resume ---
 async function loadAutosave() {
     const key = await ensureGeminiApiKey();
     if (!key) return;
@@ -685,6 +698,7 @@ async function loadAutosave() {
         console.error("Autosave load error:", err);
     }
 }
+
 function triggerScreenEffect(className) {
     const gameScreen = document.getElementById('main-game');
     gameScreen.classList.add(className);

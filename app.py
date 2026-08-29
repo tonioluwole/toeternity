@@ -8,7 +8,9 @@ from flask import Flask, jsonify, render_template, request, Response
 from flask import session
 from flask_session import Session
 from google import genai
+import random
 from google.genai import types
+from pydantic import BaseModel
 from models import DMResponse
 from google.cloud import texttospeech
 
@@ -132,6 +134,7 @@ You are the Game Master for 'Eternity', a high-fantasy RPG inspired by the livel
 TONE, SETTING & NARRATIVE STYLE:
 - SETTING: A vibrant fantasy world filled with bustling adventurer guilds, lively taverns, and dangerous wilds. NPCs include diverse humanoid races (elves, tieflings, dwarves, orcs, etc.), while non-humanoid creatures are strictly beasts or monsters.
 - STYLE: Use plain, accessible English. You can use mild fantasy flavor, but avoid overly archaic, medieval, or dense jargon. 
+- HUMOR: Maintain a gripping, high-stakes cinematic feel, but inject a slight, dry sense of humor and witty observational irony into your narration. Gently poke fun at the hero when they roll poorly, make questionable decisions, or interact with eccentric NPCs.
 - Focus on gripping, cinematic storytelling. Describe environments and action sequences vividly, blending magical combat with tactical action.
 - PACING: Keep your narrative responses concise (2 to 3 paragraphs maximum). Avoid wall-of-text responses.
 - PLAYER AGENCY: Never dictate the hero's actions, thoughts, or dialogue. Always describe the *results* of their action, then end your response with a clear hook, consequence, or question that prompts the player on what to do next.
@@ -163,9 +166,9 @@ NPC_ROUTING_RULES = {
 
     "Crow": """
     Evaluate player action against this strict decision logic flowchart:
-    - IF player threatens Crow or tries to steal the puzzle pieces -> Route to Node A: Crow summons a minor mechanical familiar to defend himself, refuses to help, and Disposition becomes 'Hostile'.
-    - IF player successfully delivers the three rare reagents -> Route to Node B: Crow becomes ecstatic, eagerly unlocks the puzzle mechanism, and Disposition becomes 'Friendly'.
-    - ELSE -> Route to Node C: Crow acts erratic and distracted, refusing to focus on the Aether Core until he gets his reagents.
+    - IF player threatens Crow or tries to steal the Core -> Route to Node A: Crow summons a minor mechanical familiar to defend himself, refuses to help, and Disposition becomes 'Hostile'.
+    - IF player successfully delivers the three boss reagents -> Route to Node B: Crow pays the agreed gold pieces, eagerly unlocks the Aether Core, and Disposition becomes 'Friendly'.
+    - ELSE -> Route to Node C: Crow acts erratic and distracted, refusing to focus on the Aether Core until the regional bosses are defeated and he gets his biological reagents.
     """
 }
 
@@ -223,7 +226,11 @@ def start_game():
         "current_chapter": 1,
         "primary_element": primary_elem, "affinity_element": aff, "struggle_element": strg,
         "specialized_path": None,
-        "inventory": ["Lesser Healing Potion", "50 Gold Pieces"],
+        "inventory": {
+            "consumables": ["Lesser Healing Potion"],
+            "equipment": [],
+            "quest_items": ["50 Gold Pieces"]
+        },
         "campaign_summary": "The hero awakens in The Chronolith Depths, remembering nothing."
     }
 
@@ -302,7 +309,7 @@ PLOT_POINTS = {
     1: "The Chronolith Depths: The hero awakens in a crumbling underground ruin with severe amnesia. To escape the initial chamber, they must systematically search the rubble for a hidden toolkit, bypass a rigged pressure-plate trap on the heavy stone exit door, and pry it open. Set 'chapter_complete' to true ONLY when the trap is safely disarmed, the door is opened, and the hero steps out into the outer catacombs.",
     2: "The Shadow Ambush: The hero navigates the winding, dark catacombs leading toward the surface. They are tracked and ambushed by a pack of feral Shadow-Hounds. They must manage their resources, fend off waves of beasts, and locate the hidden stairway leading up to the surface forest. Set 'chapter_complete' to true ONLY when the hound pack is defeated or evaded and the hero reaches the forest edge.",
     3: "The Glimmering Nuisance: Emerging into the forest, the hero spots a sarcastic, fast-talking female fairy named Gogo trapped inside a glass lantern held by a suspicious wandering scavenger. They must negotiate, intimidate, or fight the scavenger to free her. Set 'chapter_complete' to true ONLY when Gogo is successfully freed and officially joins the party as a companion.",
-    4: "The Prism Mechanism: The hero travels to the nearest frontier town and tracks down an eccentric scholar named Crow who knows about the Aether Core. To get answers, the hero must help Crow gather three rare reagents from the town market and solve a complex multi-tiered crystal light puzzle. Set 'chapter_complete' to true ONLY when all reagents are delivered, the light puzzle is solved, and the Core unlocks.",
+    4: "The Scholar's Bounty: The hero tracks down an eccentric scholar named Crow, who reveals that unlocking the Aether Core requires three rare biological reagents held by formidable regional bosses. Crow offers a contract of 15,000 gold pieces to fund the hunt. The hero must track and defeat these targets: the Charred Goliath, a hulking fire-brute residing in a molten crater that utilizes devastating area-of-effect slam attacks; the Whisper Weaver, a hyper-agile assassin stalking the canopy of a blighted forest with toxic projectile strikes; and the Deep-Trench Siren, a manipulative aquatic horror in a flooded cavern that attempts to mind-control the player. Set 'chapter_complete' to true ONLY when all three bosses are defeated, the reagents are secured, and the hero returns to Crow to unlock the Core.",
     5: "The Betrayal: The unlocked Core projects a holographic map to the World-Forge, but Crow betrays the hero, stealing the map, triggering a security lockdown, and summoning two heavy elemental golems. The hero must fight through the golems and disable the room's magical lockdown. Set 'chapter_complete' to true ONLY when the golems are destroyed, the lockdown is bypassed, and Crow's escape trail is found.",
     6: "The World-Forge Climax: The hero tracks Crow across hazardous terrain to the heart of the World-Forge for an intense, multi-phase boss battle to prevent the continent from shattering. Set 'chapter_complete' to true ONLY when Crow is beaten and the Aether Core is secured.",
     7: "The Legacy: The main quest is over. Allow the player to freely explore the world, take on local guild bounties, and build their legacy."
@@ -312,6 +319,9 @@ PLOT_POINTS = {
 def process_action():
     data = request.json
     action = data.get("action", "")
+
+    # 1. Generate the true mathematical roll
+    actual_roll = random.randint(1, 20)
     
     # --- State Payload Offloading: Read from Session ---
     character = session.get('character', {})
@@ -334,6 +344,7 @@ def process_action():
         if npc_name in npc_ledger or npc_name in action:
             active_routing += f"\nROUTING RULES FOR {npc_name}: {NPC_ROUTING_RULES[npc_name]}"
     
+    # 2. Inject the roll into the prompt instruction
     prompt = (
         f"Hero State: {json.dumps(character)}\n"
         f"The Story So Far (Long-Term Memory):\n{character.get('campaign_summary', '')}\n\n"
@@ -342,7 +353,9 @@ def process_action():
         f"{active_routing}\n\n"
         f"CURRENT PLOT OBJECTIVE: {chapter_goal}\n\n"
         f"Action: '{action}'\n"
-        "Evaluate action, roll d20, apply rules, update state."
+        f"The player rolled exactly {actual_roll} out of 20 for this action. "
+        "Apply the rules for Critical Failure (1), Failure (2-10), Success (11-19), or Critical Success (20) based strictly on this roll. "
+        "Update the state and narrate the outcome accordingly."
     )
     
     client = get_gemini_client()
@@ -416,7 +429,7 @@ def process_action():
     return jsonify({
         "character": char_dict, 
         "narrative": dm_data.narrative, 
-        "d20_roll": dm_data.d20_roll, 
+        "d20_roll": actual_roll, 
         "is_dead": is_dead, 
         "path_choices": path_choices,
         "npc_ledger": npc_ledger,
@@ -459,10 +472,16 @@ def consume_item():
     item = data.get("item")
     char = session.get('character', {})
     
-    if item in char.get("inventory", []):
-        char["inventory"].remove(item)
+    # Safely get the consumables list from the new nested structure
+    inventory = char.get("inventory", {})
+    consumables = inventory.get("consumables", [])
+    
+    if item in consumables:
+        consumables.remove(item)
+        char["inventory"]["consumables"] = consumables
+        
         heal_amount = 5
-        char["hp"] = min(char["max_hp"], char["hp"] + heal_amount)
+        char["hp"] = min(char.get("max_hp", 20), char.get("hp", 0) + heal_amount)
         
         # Save back to session
         session['character'] = char
