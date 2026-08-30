@@ -406,121 +406,107 @@ async function sendAction() {
     input.value = '';
     log.scrollTop = log.scrollHeight;
 
-    const res = await fetch('/api/action', {
-        method: 'POST',
-        headers: apiHeaders(),
-        body: JSON.stringify({ action: action })
-    });
-
-    const previousChapter = characterState ? characterState.current_chapter : 1;
-    const data = await res.json();
-    
-    characterState = data.character;
-    window.currentNpcLedger = data.npc_ledger;
-    const currentChapter = characterState.current_chapter || 1;
-
-    if (currentChapter > previousChapter) {
-        log.innerHTML += `\n${renderChapterBanner(currentChapter)}\n`;
-    }
-
-    updateUI();
-    updateNPCs(data.npc_ledger);
-
-    if (data.atmosphere) {
-        setAtmosphere(data.atmosphere);
-    }
-
-    if (data.d20_roll) {
-        const rollId = 'roll-' + Date.now();
-        log.innerHTML += `\n<div id="${rollId}" class="roll-badge badge-neutral">🎲 Roll: <span class="roll-number">?</span></div>\n\n`;
-        
-        const rollElement = document.getElementById(rollId);
-        const numSpan = rollElement.querySelector('.roll-number');
-        let cycleCount = 0;
-        
-        // Cycle numbers rapidly for 1 second (20 iterations at 50ms)
-        const rollInterval = setInterval(() => {
-            numSpan.innerText = Math.floor(Math.random() * 20) + 1;
-            cycleCount++;
-            
-            if (cycleCount >= 20) {
-                clearInterval(rollInterval);
-                let rollClass = "roll-success";
-                let rollText = "Success";
-                
-                if (data.d20_roll === 1) {
-                    rollClass = "roll-crit-fail";
-                    rollText = "Critical Failure!";
-                    triggerScreenEffect('crit-fail-anim');
-                } else if (data.d20_roll === 20) {
-                    rollClass = "roll-crit-success";
-                    rollText = "Critical Success!";
-                    triggerScreenEffect('crit-success-anim');
-                } else if (data.d20_roll <= 10) {
-                    rollClass = "roll-fail";
-                    rollText = "Failure";
-                }
-                
-                rollElement.className = `roll-badge ${rollClass}`;
-                rollElement.innerHTML = `🎲 Roll: ${data.d20_roll} (${rollText})`;
-                
-                if (!isUserScrolling) log.scrollTop = log.scrollHeight;
-            }
-        }, 50);
-    }
-
-    chatHistory.push({ role: "Hero", content: action });
-    chatHistory.push({ role: "Game Master", content: data.narrative.replace(/\*/g, '') });
-    if (chatHistory.length > 6) {
-        chatHistory = chatHistory.slice(chatHistory.length - 6);
-    }
-
-    setTimeout(() => {
-        if (typeof speakDM === 'function') {
-            speakDM(data.narrative.replace(/\*/g, ''));
-        }
-    }, 0);
-
-    const textContainer = document.createElement('span');
-    log.appendChild(textContainer);
-    
-    let i = 0;
-    const textToType = data.narrative;
     const actionInput = document.getElementById('action-input');
     const actionButton = document.getElementById('action-button');
     
+    // Disable inputs immediately to prevent command spamming during animations
     actionInput.disabled = true;
     actionButton.disabled = true;
 
-    
+    try {
+        const res = await fetch('/api/action', {
+            method: 'POST',
+            headers: apiHeaders(),
+            body: JSON.stringify({ action: action })
+        });
 
-    function typeWriter() {
-        if (i < textToType.length) {
-            textContainer.innerHTML += textToType.charAt(i);
-            i++;
-            
-            // Replace the old line with this conditional block
-            if (!isUserScrolling) {
-                log.scrollTop = log.scrollHeight; 
-            }
-            
-            setTimeout(typeWriter, 5); 
-        } else {
-            actionInput.disabled = false;
-            actionButton.disabled = false;
-            actionInput.focus();
+        const previousChapter = characterState ? characterState.current_chapter : 1;
+        const data = await res.json();
+        
+        characterState = data.character;
+        window.currentNpcLedger = data.npc_ledger;
+        const currentChapter = characterState.current_chapter || 1;
 
-            if (data.is_dead) {
-                document.getElementById('death-modal').style.display = 'flex';
-            } else if (data.path_choices) {
-                showPathModal(data.path_choices);
-            }
-            
-            autoSaveGame();
+        if (currentChapter > previousChapter) {
+            log.innerHTML += `\n${renderChapterBanner(currentChapter)}\n`;
         }
+
+        updateUI();
+        updateNPCs(data.npc_ledger);
+
+        if (data.atmosphere) {
+            setAtmosphere(data.atmosphere);
+        }
+
+        chatHistory.push({ role: "Hero", content: action });
+        chatHistory.push({ role: "Game Master", content: data.narrative.replace(/\*/g, '') });
+        if (chatHistory.length > 6) {
+            chatHistory = chatHistory.slice(chatHistory.length - 6);
+        }
+
+        if (data.d20_roll) {
+            let rollClass = "roll-success";
+            let rollText = "Success";
+            
+            if (data.d20_roll === 1) {
+                rollClass = "roll-crit-fail";
+                rollText = "Critical Failure!";
+                triggerScreenEffect('crit-fail-anim');
+            } else if (data.d20_roll === 20) {
+                rollClass = "roll-crit-success";
+                rollText = "Critical Success!";
+                triggerScreenEffect('crit-success-anim');
+            } else if (data.d20_roll <= 10) {
+                rollClass = "roll-fail";
+                rollText = "Failure";
+            }
+            
+            log.innerHTML += `\n<div class="roll-badge ${rollClass}">🎲 Roll: ${data.d20_roll} (${rollText})</div>\n\n`;
+            if (!isUserScrolling) log.scrollTop = log.scrollHeight;
+        }
+
+        setTimeout(() => {
+            if (typeof speakDM === 'function') {
+                speakDM(data.narrative.replace(/\*/g, ''));
+            }
+        }, 0);
+
+        const textContainer = document.createElement('span');
+        log.appendChild(textContainer);
+        
+        let i = 0;
+        const textToType = data.narrative;
+        
+        function typeWriter() {
+            if (i < textToType.length) {
+                textContainer.innerHTML += textToType.charAt(i);
+                i++;
+                if (!isUserScrolling) {
+                    log.scrollTop = log.scrollHeight; 
+                }
+                setTimeout(typeWriter, 5); 
+            } else {
+                actionInput.disabled = false;
+                actionButton.disabled = false;
+                actionInput.focus();
+
+                if (data.is_dead) {
+                    document.getElementById('death-modal').style.display = 'flex';
+                } else if (data.path_choices) {
+                    showPathModal(data.path_choices);
+                }
+                autoSaveGame();
+            }
+        }
+        
+        typeWriter();
+
+
+    } catch (err) {
+        console.error("Action Error:", err);
+        actionInput.disabled = false;
+        actionButton.disabled = false;
     }
-    
-    typeWriter();
 }
 
 function showJournal() {
@@ -724,7 +710,7 @@ function importSaveFile(event) {
     event.target.value = ""; 
 }
 
-function loadStateIntoGame(data) {
+async function loadStateIntoGame(data) {
     characterState = data.character;
     previousHP = characterState.hp; // Reset baseline upon loading
     chatHistory = data.history || [];
@@ -733,9 +719,25 @@ function loadStateIntoGame(data) {
     document.getElementById("story-log").innerHTML = data.story_log_html || "";
     updateUI();
     updateNPCs(window.currentNpcLedger);
+    
     document.getElementById("start-modal").style.display = "none";
     const creationModal = document.getElementById('creation-modal');
     if (creationModal) creationModal.style.display = 'none';
+
+    // Force the Python backend to synchronize with this loaded save state
+    try {
+        await fetch('/api/sync_save', {
+            method: 'POST',
+            headers: apiHeaders(),
+            body: JSON.stringify({
+                character: characterState,
+                history: chatHistory,
+                npc_ledger: window.currentNpcLedger
+            })
+        });
+    } catch (err) {
+        console.error("Critical Error: Failed to sync loaded save with Game Master.", err);
+    }
 
     autoSaveGame();
 }

@@ -176,6 +176,14 @@ NPC_ROUTING_RULES = {
 def index():
     return render_template("index.html")
 
+@app.route("/api/sync_save", methods=["POST"])
+def sync_save():
+    data = request.json
+    session['character'] = data.get('character', {})
+    session['history'] = data.get('history', [])
+    session['npc_ledger'] = data.get('npc_ledger', {})
+    return jsonify({"status": "synced"})
+
 @app.route("/api/start_game", methods=["POST"])
 def start_game():
     data = request.json
